@@ -21,6 +21,7 @@ Every verb prints JSON. There is no TUI in this repository: nabe is the TUI (`o 
 Module `ofam.dev/o-ai`; requires Go 1.26 or newer.
 
 ```sh
+go install ofam.dev/oden/cmd/o@latest   # oden's o: `o ai` runs o-ai, no dash needed
 go install ofam.dev/o-ai@latest
 ```
 
@@ -28,7 +29,7 @@ or, from a checkout:
 
 ```sh
 go build -o ~/bin/o-ai .
-o-ai help            # the commands
+o-ai help            # the commands, run directly
 o ai skill list      # through the o root
 mtm ai skill list    # through mtm (its second lookup prefix is o)
 ```
@@ -40,19 +41,19 @@ mtm ai skill list    # through mtm (its second lookup prefix is o)
 A first look, over the invented setup the demo uses (two Claude Code skills and an agent, Claude and Codex settings, an MCP server each; [docs/vhs](docs/vhs)). Every verb prints JSON; lists are rows of `{id, label, data, cells}`:
 
 ```console
-$ o-ai status list
+$ o ai status list
 [
   {"id":"status/harnesses","label":"harnesses: 7","data":{"kind":"harnesses","count":7},"cells":["harnesses","7"]},
   {"id":"status/providers","label":"providers: 2","data":{"kind":"providers","count":2},"cells":["providers","2"]},
   {"id":"status/models","label":"models: 2","data":{"kind":"models","count":2},"cells":["models","2"]},
   ...
 ]
-$ o-ai mcp list | jq -c '.[0]'
+$ o ai mcp list | jq -c '.[0]'
 {"id":"mcp/claude:user:weather","label":"weather [claude]","data":{"id":"claude:user:weather","name":"weather","harness":"claude","scope":"user","config":"/private/tmp/oai.XXXX/home/.claude.json","transport":"http","url":"https://weather.example.com/mcp"},"cells":["weather","claude","user","http","https://weather.example.com/mcp"]}
-$ o-ai sk li | jq -r '.[].label'          # sk li is skill list
+$ o ai sk li | jq -r '.[].label'          # sk li is skill list
 release-notes [claude]
 review [claude]
-$ o-ai skill show review | jq '{name, description, harnesses, scope}'
+$ o ai skill show review | jq '{name, description, harnesses, scope}'
 {
   "name": "review",
   "description": "Review a diff for bugs, missing tests and unclear names.",
@@ -68,7 +69,7 @@ gpt-5-codex [codex]
 
 ### Commands
 
-The nouns are an ochazuke runtime behind `ochazuke/cli`: `o-ai NOUN VERB [ENTRY] [--ARG VALUE] [--target ROW_ID]`.
+The nouns are an ochazuke runtime behind `ochazuke/cli`: `o ai NOUN VERB [ENTRY] [--ARG VALUE] [--target ROW_ID]`.
 
 | Noun | Verbs | A row's data (the record aiview printed) |
 | --- | --- | --- |
@@ -100,7 +101,7 @@ o ai skill list --format jsonl        # one {noun, id, label, data} per line
 o ai mcps                             # every configured MCP server of every harness
 o ai mcp tools tuios                  # the tuios server's tools (mcp-tool list tuios)
 o ai                                  # status list
-o-ai catalog                          # the nouns and verbs, for a host
+o ai catalog                          # the nouns and verbs, for a host
 ```
 
 Help uses the same grouped command metadata as the runtime catalog, including the framework's nouns. A bare group (`o ai model` or `o ai provider`) lists its verbs without collecting inventory or contacting a provider; `--help` also works on groups and operations (`o ai model list --help`).
@@ -159,8 +160,8 @@ Claude's windows are the usage answer's `limits` (`session`, `weekly_all`, `week
 | `aiview NOUN list --json` (array of records) | `o ai NOUN list` (rows; each record is a row's `data`) |
 | `--json` (JSON output) | gone: output is always JSON; `--json` now takes the parameters as an object |
 | flags before the command words | flags after NOUN VERB |
-| `aiview tui` | `o tui`, after `o-nabe extension register o-ai` |
-| `aiview --help` | `o-ai help` |
+| `aiview tui` | `o tui`, after `o nabe extension register o-ai` |
+| `aiview --help` | `o ai help` |
 
 ## Concepts
 
@@ -207,7 +208,7 @@ A model's stable inventory ID includes its harness and provider, such as `omp:op
 `status state` is the catalog's state source (`"state": "status.state"`, the ochazuke/cli convention): one process, one collection covering every noun's need, processes inspected once, answering every list as JSON Lines, one row per line tagged with its noun, no outer array:
 
 ```js
-// o-ai status state
+// o ai status state
 {"noun":"harness","id":"harness/claude","label":"claude","data":{"id":"claude","installed":true,"configured":true,"executable":"/Users/me/.local/bin/claude","processStatus":"3 running processes (including helpers)","catalogStatus":"live initialization metadata"}}
 {"noun":"skill","id":"skill/skill:claude:/Users/me/.claude/skills/review/SKILL.md","label":"review [claude]","data":{"name":"review","description":"Review a diff…","path":"/Users/me/.claude/skills/review/SKILL.md","harnesses":["claude"],"scope":"Claude user"}}
 // ... every row of harness, provider, model, thinking, skill, agent, settings, status
@@ -305,11 +306,11 @@ o-ai is one of the family's `o-*` tools: an [oden](https://github.com/ofamtools/
 ### The TUI is nabe
 
 ```sh
-MTM_SERVER=default o-nabe extension register o-ai   # registers as "ai"
+MTM_SERVER=default o nabe extension register o-ai   # registers as "ai"
 o tui                                               # a page ai with one list per noun
 ```
 
-Restart nabe after `o-nabe extension refresh o-ai`. A row's verbs run as `o-ai NOUN VERB --target ROW_ID --json '{}' --yes`.
+Restart nabe after `o nabe extension refresh o-ai`. A row's verbs run as `o-ai NOUN VERB --target ROW_ID --json '{}' --yes`.
 
 The state nabe reads is under [Concepts](#the-state).
 
@@ -325,7 +326,7 @@ go vet ./...
 go build .
 ```
 
-The tests cover command ambiguity, the catalog (schema 1, `rows` on every list), row ids and `--target`, model selection, reasoning arguments, credential redaction, JSONC/TOML parsing, invalid configuration visibility, symlink cycles, non-chat launch handling, and script-based process identity. Real native commands must also be exercised after adapter changes (`o-ai status show`), and the nabe page after catalog changes (`o-nabe extension refresh o-ai && o-tui --smoke`).
+The tests cover command ambiguity, the catalog (schema 1, `rows` on every list), row ids and `--target`, model selection, reasoning arguments, credential redaction, JSONC/TOML parsing, invalid configuration visibility, symlink cycles, non-chat launch handling, and script-based process identity. Real native commands must also be exercised after adapter changes (`o ai status show`), and the nabe page after catalog changes (`o nabe extension refresh o-ai && o tui --smoke`).
 
 ## Logo and demo
 
