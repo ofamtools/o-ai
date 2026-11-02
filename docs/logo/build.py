@@ -9,8 +9,8 @@ docs/logo/alt/     the same three files for concept o-ai-5, Unplugged: the
                    and caches and never makes a model request. Kept beside
                    the primary until the owner chooses.
 
-Both concepts come from ~/hub/o-plans/icons/build.py, whose drawing this
-copies. The sets follow ochazuke's and matomeru's assets/: a 128x128 icon on
+Both concepts use the family's hand-drawn icon vocabulary. The sets follow
+ochazuke's and matomeru's assets/: a 128x128 icon on
 a rounded tile (rx 28) in a dark tint of the tool's hue, and a logo with the
 name in the family's monoline lettering, drawn as paths so no font is
 needed. Standard library only, except --preview.

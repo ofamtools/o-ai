@@ -4,14 +4,14 @@ The AI hub's data tool (`o-ai`, so `o ai` and `mtm ai`). An oden app with an och
 
 ## Plans and todos
 
-Family plans, todos and the roadmap live in `~/hub/o-plans/` (`README.md` is the index). Read it before planning work; add or update items there. Do not add a TODO.md or docs/plans/ to this repo.
+Keep planning work in the family planning workspace, separate from this repository. Do not add a TODO.md or docs/plans/ to this repo.
 
 ## Read in this order
 
 1. This file, then `README.md` for the commands, the row shape and the aiview spellings.
 2. `../ochazuke/AGENTS.md`, section "Building an application on ochazuke", and `../ochazuke/cli/{shell.go,mount.go,catalog.go}`.
 3. `../nabe/README.md`: what a host reads (application nouns, a list verb with `rows`, rows `{id, label, data}`).
-4. `~/hub/o-plans/plans/cli-extensions.md`, section 6 (`mtm-ai`): the plan the mcp and mcp-tool nouns came from.
+4. `mcp.go`: MCP servers come from harness configuration; tool inventories come from harness caches without starting servers.
 
 ## Where does X live
 
