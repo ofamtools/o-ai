@@ -81,7 +81,9 @@ func TestQuotaKeepsLastGoodRowsOn429(t *testing.T) {
 		}
 	}
 	before := *n
-	// The failure was not a fresh fetch: the next call asks again.
+	// The failure was not a fresh fetch: once the back-off is over the
+	// next call asks again.
+	*now = now.Add(61 * time.Second)
 	w.run("quota", "list", "claude")
 	if *n != before+1 {
 		t.Fatalf("the 429 reset the cache time: %d requests, want %d", *n, before+1)
@@ -99,5 +101,55 @@ func TestQuotaWithoutGoodRowsStillShowsTheError(t *testing.T) {
 	out, err := w.run("quota", "list", "claude")
 	if err == nil || !strings.Contains(out, "quota/claude:error") {
 		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+func TestQuotaBacksOffAfterARefusal(t *testing.T) {
+	w, n, now := cachedWorld(t)
+	w.run("quota", "list", "claude")
+	*now = now.Add(10 * time.Minute) // expired
+	w.claude = func(rw http.ResponseWriter, r *http.Request) {
+		*n++
+		http.Error(rw, "slow down", http.StatusTooManyRequests)
+	}
+	w.run("quota", "list", "claude")
+	after := *n // the refused request
+	*now = now.Add(30 * time.Second)
+	out, err := w.run("quota", "list", "claude")
+	if err != nil || *n != after || !strings.Contains(out, "quota/claude:weekly_all") || !strings.Contains(out, "429") {
+		t.Fatalf("inside the back-off: %v, %d requests (was %d)\n%s", err, *n, after, out)
+	}
+	for _, bypass := range [][]string{{"quota", "list", "claude", "--fresh"}, {"quota", "refresh", "claude"}} {
+		before := *n
+		w.run(bypass...)
+		if *n != before+1 {
+			t.Fatalf("%v: %d requests, want %d", bypass, *n, before+1)
+		}
+	}
+	*now = now.Add(61 * time.Second) // back-off over
+	before := *n
+	w.run("quota", "list", "claude")
+	if *n != before+1 {
+		t.Fatalf("after the back-off: %d requests, want %d", *n, before+1)
+	}
+	// A good answer ends it: the next call is served from the cache.
+	w.claude = func(rw http.ResponseWriter, r *http.Request) { *n++; rw.Write([]byte(claudeFixture)) }
+	*now = now.Add(61 * time.Second)
+	w.run("quota", "list", "claude")
+	before = *n
+	w.run("quota", "list", "claude")
+	if *n != before {
+		t.Fatalf("a good answer was not cached: %d requests, want %d", *n, before)
+	}
+}
+
+func TestQuotaBacksOffWithNoGoodRows(t *testing.T) {
+	w, n, now := cachedWorld(t)
+	w.claude = func(rw http.ResponseWriter, r *http.Request) { *n++; http.Error(rw, "no", http.StatusTooManyRequests) }
+	w.run("quota", "list", "claude")
+	*now = now.Add(20 * time.Second)
+	out, err := w.run("quota", "list", "claude")
+	if *n != 1 || err == nil || !strings.Contains(out, "quota/claude:error") {
+		t.Fatalf("%d requests, %v\n%s", *n, err, out)
 	}
 }

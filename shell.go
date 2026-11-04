@@ -497,6 +497,14 @@ func (t *Tool) options(args ochazuke.Arguments) (Options, string, error) {
 		}
 		o.TTL = d
 	}
+	o.Backoff = time.Minute
+	if v := ochazuke.StringArg(args, "backoff", ""); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < 0 {
+			return o, "", fmt.Errorf("invalid --backoff %q (a duration, 0s or more)", v)
+		}
+		o.Backoff = d
+	}
 	var err error
 	if o.Home, err = filepath.Abs(expandPath(o.Home, t.Home, t.Cwd)); err != nil {
 		return o, "", err

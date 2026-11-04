@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,6 +97,7 @@ func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
 		"timeout": {Type: "string", Description: "the usage request's deadline, a Go duration (default 15s)"},
 		"fresh":   {Type: "boolean", Description: "ask the vendor now even if the cached quota is young"},
 		"ttl":     {Type: "string", Description: "how old a cached quota may be, a Go duration (default 5m; 0s asks the vendor)"},
+		"backoff": {Type: "string", Description: "after a vendor refusal, how long before it is asked again, a Go duration (default 1m); --fresh and refresh ask anyway"},
 	}
 	r.Define("quota").
 		Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) },
@@ -227,14 +227,28 @@ func (t *Tool) quotaShow(c ochazuke.Ctx) ochazuke.Result {
 func (t *Tool) quotas(o Options, harnesses []string) []Quota {
 	out := make([]Quota, len(harnesses))
 	cache := t.readQuotaCache()
-	fetched := make([]bool, len(harnesses)) // answered by the vendor just now
+	fetched := make([]bool, len(harnesses))  // answered by the vendor just now
+	failed := make([]string, len(harnesses)) // the vendor's refusal just now
 	var wg sync.WaitGroup
 	for i, h := range harnesses {
 		key := h + "@" + o.Home
-		good, have := cache[key]
-		if have && !o.Fresh && o.TTL > 0 && t.fresh(good.FetchedAt, o.TTL) {
-			out[i] = good.Quota // served from the cache: no vendor call
-			continue
+		prior, have := cache[key]
+		if have && !o.Fresh {
+			if len(prior.Windows) > 0 && o.TTL > 0 && t.fresh(prior.FetchedAt, o.TTL) {
+				out[i] = prior.Quota // served from the cache: no vendor call
+				continue
+			}
+			if prior.FailedAt != "" && t.fresh(prior.FailedAt, o.Backoff) {
+				// The vendor refused a moment ago: do not ask again yet.
+				out[i] = prior.Quota
+				out[i].Windows = append([]QuotaWindow{}, prior.Windows...)
+				if len(prior.Windows) > 0 {
+					out[i].Stale = "refresh failed: " + prior.FailedWhy
+				} else {
+					out[i].Error = prior.FailedWhy
+				}
+				continue
+			}
 		}
 		wg.Add(1)
 		go func() {
@@ -251,31 +265,45 @@ func (t *Tool) quotas(o Options, harnesses []string) []Quota {
 			if q.Windows == nil {
 				q.Windows = []QuotaWindow{}
 			}
-			if q.Error != "" && have && len(good.Windows) > 0 {
-				// The vendor refused (a 429): the last good rows stay,
-				// the error shows beside them, and the cached time is
-				// not touched, so this is not a fresh fetch.
-				why := q.Error
-				q = good.Quota
-				q.Stale = "refresh failed: " + why
+			if q.Error != "" {
+				failed[i] = q.Error
+				if have && len(prior.Windows) > 0 {
+					// The vendor refused (a 429): the last good rows stay
+					// and the error shows beside them. The fetch time is
+					// not touched, so this is not a fresh fetch.
+					q = prior.Quota
+					q.Stale = "refresh failed: " + failed[i]
+				}
 				out[i] = q
 				return
 			}
 			out[i] = q
-			fetched[i] = q.Error == "" && q.Source == "api" && len(q.Windows) > 0
+			fetched[i] = q.Source == "api" && len(q.Windows) > 0
 		}()
 	}
 	wg.Wait()
+	changed := false
+	now := t.clock().UTC().Format(time.RFC3339)
 	for i, h := range harnesses {
-		if fetched[i] {
-			e := quotaEntry{FetchedAt: t.clock().UTC().Format(time.RFC3339), Quota: out[i]}
+		key := h + "@" + o.Home
+		switch {
+		case fetched[i]:
+			e := quotaEntry{FetchedAt: now, Quota: out[i]}
 			for _, w := range out[i].Windows {
 				e.Keys = append(e.Keys, w.key)
 			}
-			cache[h+"@"+o.Home] = e
+			cache[key], changed = e, true
+		case failed[i] != "":
+			e := cache[key] // the last good answer stays; the failure is noted
+			e.FailedAt, e.FailedWhy = now, failed[i]
+			if e.Keys == nil {
+				e.Quota = Quota{Harness: h, Windows: []QuotaWindow{}}
+				e.Keys = []string{}
+			}
+			cache[key], changed = e, true
 		}
 	}
-	if slices.Contains(fetched, true) {
+	if changed {
 		t.writeQuotaCache(cache)
 	}
 	return out
@@ -285,8 +313,10 @@ func (t *Tool) quotas(o Options, harnesses []string) []Quota {
 // times only (a Quota holds no token or credential), and when it was
 // fetched.
 type quotaEntry struct {
-	FetchedAt string   `json:"fetchedAt"`
-	Keys      []string `json:"keys"` // the windows' row id parts, which a QuotaWindow does not marshal
+	FetchedAt string   `json:"fetchedAt,omitempty"`
+	FailedAt  string   `json:"failedAt,omitempty"`  // the vendor's last refusal; no new request for --backoff
+	FailedWhy string   `json:"failedWhy,omitempty"` // what it said
+	Keys      []string `json:"keys"`                // the windows' row id parts, which a QuotaWindow does not marshal
 	Quota
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,9 @@ import (
 func TestHostedQuotaListFillsThroughItsVerb(t *testing.T) {
 	w := newQuotaWorld(t)
 	w.cache = t.TempDir()
+	requests := 0
+	inner := w.claude
+	w.claude = func(rw http.ResponseWriter, r *http.Request) { requests++; inner(rw, r) }
 	w.claudeLogin(quotaNow.Add(time.Hour))
 	catalog, err := w.run("catalog")
 	if err != nil {
@@ -77,7 +81,7 @@ func TestHostedQuotaListFillsThroughItsVerb(t *testing.T) {
 			n++
 		}
 	}
-	if n != 1 {
-		t.Fatalf("quota.list ran %d times for 2 loads (the page reuses a live list within pages.live-ttl): %v", n, calls)
+	if n != 2 || requests != 1 {
+		t.Fatalf("quota.list ran %d times for 2 loads and the vendor was asked %d times (o-ai's cache answers the second): %v", n, requests, calls)
 	}
 }
