@@ -19,6 +19,7 @@ type Options struct {
 	Server   string        // mcp and mcp-tool rows of this server name
 	Fresh    bool          // collect even when the cache holds a young inventory
 	TTL      time.Duration // how old a cached inventory may be
+	Backoff  time.Duration // how long after a vendor refusal quota does not ask again
 
 	inputs *inputSet // the paths a collection reads (inputs.go); nil records nothing
 }

@@ -287,6 +287,11 @@ func (t *Tool) shell() *ocli.Shell {
 	r.Operations["status.list"] = withParams(r.Operations["status.list"], merged(collectParams, formatParam))
 	r.Operations["status.show"] = withParams(r.Operations["status.show"], collectParams)
 	t.defineQuota(r, lists["quota"])
+	for noun, spec := range specs { // the nouns the state leaves out are declared live
+		if spec.live {
+			r.Define(noun).Live()
+		}
+	}
 	for noun, tb := range tables { // the catalog's columns, and the lists drawn as tables
 		r.Define(noun).Columns(tb.columns...)
 		lists[noun].SetColumns(tb.columns...)
@@ -491,6 +496,14 @@ func (t *Tool) options(args ochazuke.Arguments) (Options, string, error) {
 			return o, "", fmt.Errorf("invalid --ttl %q (a duration, 0s or more)", v)
 		}
 		o.TTL = d
+	}
+	o.Backoff = time.Minute
+	if v := ochazuke.StringArg(args, "backoff", ""); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < 0 {
+			return o, "", fmt.Errorf("invalid --backoff %q (a duration, 0s or more)", v)
+		}
+		o.Backoff = d
 	}
 	var err error
 	if o.Home, err = filepath.Abs(expandPath(o.Home, t.Home, t.Cwd)); err != nil {
