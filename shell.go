@@ -287,6 +287,11 @@ func (t *Tool) shell() *ocli.Shell {
 	r.Operations["status.list"] = withParams(r.Operations["status.list"], merged(collectParams, formatParam))
 	r.Operations["status.show"] = withParams(r.Operations["status.show"], collectParams)
 	t.defineQuota(r, lists["quota"])
+	for noun, spec := range specs { // the nouns the state leaves out are declared live
+		if spec.live {
+			r.Define(noun).Live()
+		}
+	}
 	for noun, tb := range tables { // the catalog's columns, and the lists drawn as tables
 		r.Define(noun).Columns(tb.columns...)
 		lists[noun].SetColumns(tb.columns...)

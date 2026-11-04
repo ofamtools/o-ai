@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,8 +31,11 @@ import (
 // Codex have used, read from each vendor's usage endpoint with the
 // harness's own login (a read-only HTTPS GET, never an inference request).
 // Codex falls back to the rate limits its newest session file recorded.
-// Quota is live: it is fetched on every call, never cached in the
-// inventory file, and needs no collection.
+// Quota is live: it is never part of the inventory or the state and needs
+// no collection. A vendor answer is kept in quota.json beside the
+// inventory cache (percentages and reset times only) and served for --ttl
+// (default 5m); --fresh, and the refresh verb, ask the vendor. A vendor
+// that refuses keeps the last good windows, with the refusal beside them.
 
 // quotaHarnesses are the harnesses quota reads, in row order.
 var quotaHarnesses = []string{"claude", "codex"}
@@ -66,6 +70,7 @@ type Quota struct {
 	ObservedAt string        `json:"observedAt,omitempty"`
 	Windows    []QuotaWindow `json:"windows"`
 	Warning    string        `json:"warning,omitempty"` // why the fallback answered
+	Stale      string        `json:"stale,omitempty"`   // why the windows are the last good answer, not a new one (a 429)
 	Error      string        `json:"error,omitempty"`
 }
 
@@ -91,15 +96,34 @@ func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
 		"harness": {Type: "string", Enum: quotaHarnesses, Description: "only this harness: claude or codex"},
 		"home":    collectParams["home"],
 		"timeout": {Type: "string", Description: "the usage request's deadline, a Go duration (default 15s)"},
+		"fresh":   {Type: "boolean", Description: "ask the vendor now even if the cached quota is young"},
+		"ttl":     {Type: "string", Description: "how old a cached quota may be, a Go duration (default 5m; 0s asks the vendor)"},
 	}
 	r.Define("quota").
 		Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) },
 			"one row per rate-limit window: {id: quota/HARNESS:WINDOW, label, data: {usedPercent, remainingPercent, resetsAt, ...}}; a harness that cannot answer is one quota/HARNESS:error row").Rows("quota").Fetch().
+		Verb("refresh", func(c ochazuke.Ctx) ochazuke.Result {
+			args := ochazuke.Arguments{}
+			for k, v := range c.Args {
+				args[k] = v
+			}
+			args["fresh"] = true // the one verb that skips the quota cache
+			return t.quotaList(args, list)
+		}, "fetch the quota windows now, past the cache (rows as list; a harness the vendor refuses keeps its last good rows)").Rows("quota").Fetch().
 		Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaShow(c) },
 			"a harness's quota record (claude or codex; none prints both): plan, source, observedAt, windows, error").Fetch()
 	listOp := withParams(r.Operations["quota.list"], merged(params, formatParam))
 	listOp.Positional = []string{"harness"} // quota list claude
 	r.Operations["quota.list"] = listOp
+	// F on a quota row fetches now, past the cache. Free in ochazuke's
+	// defaults and in mtm's list keys (a and D are retired there; every
+	// other letter but B, F, H, M, Z is taken).
+	if err := r.Bind(ochazuke.Binding{Mode: "normal", Noun: "quota", Keys: "F", Request: ochazuke.Request{Noun: "quota", Verb: "refresh"}, Hint: "fetch quota now"}); err != nil {
+		panic(err)
+	}
+	refresh := withParams(r.Operations["quota.refresh"], merged(params, formatParam))
+	refresh.Positional = []string{"harness"}
+	r.Operations["quota.refresh"] = refresh
 	show := withParams(r.Operations["quota.show"], merged(params, map[string]ochazuke.Parameter{
 		"entry": {Type: "string", Enum: quotaHarnesses, Description: "claude or codex"},
 	}))
@@ -202,26 +226,121 @@ func (t *Tool) quotaShow(c ochazuke.Ctx) ochazuke.Result {
 // quotas reads each harness's quota concurrently, in harnesses' order.
 func (t *Tool) quotas(o Options, harnesses []string) []Quota {
 	out := make([]Quota, len(harnesses))
+	cache := t.readQuotaCache()
+	fetched := make([]bool, len(harnesses)) // answered by the vendor just now
 	var wg sync.WaitGroup
 	for i, h := range harnesses {
+		key := h + "@" + o.Home
+		good, have := cache[key]
+		if have && !o.Fresh && o.TTL > 0 && t.fresh(good.FetchedAt, o.TTL) {
+			out[i] = good.Quota // served from the cache: no vendor call
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), o.Timeout)
 			defer cancel()
+			var q Quota
 			switch h {
 			case "claude":
-				out[i] = t.claudeQuota(ctx, o)
+				q = t.claudeQuota(ctx, o)
 			case "codex":
-				out[i] = t.codexQuota(ctx, o)
+				q = t.codexQuota(ctx, o)
 			}
-			if out[i].Windows == nil {
-				out[i].Windows = []QuotaWindow{}
+			if q.Windows == nil {
+				q.Windows = []QuotaWindow{}
 			}
+			if q.Error != "" && have && len(good.Windows) > 0 {
+				// The vendor refused (a 429): the last good rows stay,
+				// the error shows beside them, and the cached time is
+				// not touched, so this is not a fresh fetch.
+				why := q.Error
+				q = good.Quota
+				q.Stale = "refresh failed: " + why
+				out[i] = q
+				return
+			}
+			out[i] = q
+			fetched[i] = q.Error == "" && q.Source == "api" && len(q.Windows) > 0
 		}()
 	}
 	wg.Wait()
+	for i, h := range harnesses {
+		if fetched[i] {
+			e := quotaEntry{FetchedAt: t.clock().UTC().Format(time.RFC3339), Quota: out[i]}
+			for _, w := range out[i].Windows {
+				e.Keys = append(e.Keys, w.key)
+			}
+			cache[h+"@"+o.Home] = e
+		}
+	}
+	if slices.Contains(fetched, true) {
+		t.writeQuotaCache(cache)
+	}
 	return out
+}
+
+// quotaEntry is the cached answer of one harness: percentages and reset
+// times only (a Quota holds no token or credential), and when it was
+// fetched.
+type quotaEntry struct {
+	FetchedAt string   `json:"fetchedAt"`
+	Keys      []string `json:"keys"` // the windows' row id parts, which a QuotaWindow does not marshal
+	Quota
+}
+
+func (t *Tool) fresh(at string, ttl time.Duration) bool {
+	when, err := time.Parse(time.RFC3339, at)
+	now := t.clock()
+	return err == nil && !now.Before(when) && now.Sub(when) < ttl
+}
+
+// quotaCachePath is the quota cache file, beside the inventory cache.
+func (t *Tool) quotaCachePath() string {
+	return filepath.Join(filepath.Dir(t.cachePath()), "quota.json")
+}
+
+// readQuotaCache is the cache file's entries by "harness@home"; a missing
+// or corrupt file is an empty cache.
+func (t *Tool) readQuotaCache() map[string]quotaEntry {
+	out := map[string]quotaEntry{}
+	if b, err := os.ReadFile(t.quotaCachePath()); err == nil {
+		if json.Unmarshal(b, &out) != nil {
+			out = map[string]quotaEntry{}
+		}
+	}
+	for k, e := range out {
+		if len(e.Keys) != len(e.Windows) {
+			delete(out, k) // unreadable: ask the vendor
+			continue
+		}
+		for i := range e.Windows {
+			e.Windows[i].key = e.Keys[i]
+		}
+	}
+	return out
+}
+
+// writeQuotaCache saves the entries atomically; a failure to write never
+// fails a verb.
+func (t *Tool) writeQuotaCache(cache map[string]quotaEntry) {
+	b, err := json.Marshal(cache)
+	if err != nil {
+		return
+	}
+	path := t.quotaCachePath()
+	if os.MkdirAll(filepath.Dir(path), 0o700) != nil {
+		return
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "quota-*.tmp")
+	if err != nil {
+		return
+	}
+	_, werr := tmp.Write(b)
+	if tmp.Close() != nil || werr != nil || os.Rename(tmp.Name(), path) != nil {
+		os.Remove(tmp.Name())
+	}
 }
 
 // quotaRows are the list's rows: each record's windows, else its error.
@@ -234,6 +353,9 @@ func quotaRows(quotas []Quota, now time.Time) []Row {
 		}
 		for _, w := range q.Windows {
 			rows = append(rows, Row{ID: "quota/" + q.Harness + ":" + w.key, Label: windowLabel(w), Data: w, Cells: cellsOf("quota", w)})
+		}
+		if q.Stale != "" {
+			rows = append(rows, Row{ID: "quota/" + q.Harness + ":error", Label: q.Harness + " quota is the last good answer (" + q.ObservedAt + "): " + q.Stale, Data: q, Cells: cellsOf("quota", q)})
 		}
 	}
 	return rows

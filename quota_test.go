@@ -41,6 +41,8 @@ type quotaWorld struct {
 	keychain     []byte
 	claudeHeader http.Header
 	codexHeader  http.Header
+	cache        string // XDG_CACHE_HOME of the runs; "" gives each run its own, so none sees an earlier answer
+	now          func() time.Time
 }
 
 func newQuotaWorld(t *testing.T) *quotaWorld {
@@ -66,8 +68,16 @@ func (w *quotaWorld) run(args ...string) (string, error) {
 	}))
 	defer codex.Close()
 	var out, errOut bytes.Buffer
-	tool := &Tool{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Env: os.Environ(), Home: w.home, Cwd: w.home, Prog: "o-ai",
-		now: func() time.Time { return quotaNow },
+	cache := w.cache
+	if cache == "" {
+		cache = w.t.TempDir()
+	}
+	clock := w.now
+	if clock == nil {
+		clock = func() time.Time { return quotaNow }
+	}
+	tool := &Tool{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Env: append(os.Environ(), "XDG_CACHE_HOME="+cache), Home: w.home, Cwd: w.home, Prog: "o-ai",
+		now: clock,
 		quota: quotaDeps{transport: http.DefaultTransport, claudeURL: claude.URL, codexURL: codex.URL,
 			keychain: func(context.Context, string) ([]byte, error) {
 				if w.keychain == nil {
@@ -326,3 +336,6 @@ const (
 	codexFixturePlan        = "plus"
 	codexFixturePrimaryUsed = 12
 )
+
+// quotaFile is the quota cache file of the world's cache dir.
+func (w *quotaWorld) quotaFile() string { return filepath.Join(w.cache, "o-ai", "quota.json") }
