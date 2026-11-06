@@ -18,7 +18,7 @@ func TestUniqueCommandPrefixes(t *testing.T) {
 	put(t, filepath.Join(home, ".codex", "models_cache.json"), `{"models":[{"slug":"opus","display_name":"Opus"}]}`)
 	flags := []string{"--home", home, "--project", home, "--no-probe"}
 	for _, args := range [][]string{
-		{"mo", "li"}, {"prov", "list"}, {"models"}, {"providers", "li"}, {"mo", "sh", "opus"}, {"mo", "se", "opus"}, {"th", "li"}, {"sk", "li"},
+		{"mo", "li"}, {"prov", "list"}, {"models"}, {"providers", "li"}, {"mo", "sh", "opus"}, {"mo", "sel", "opus"}, {"th", "li"}, {"sk", "li"},
 	} {
 		if _, _, err := runCLI(t, append(args, flags...)...); err != nil {
 			t.Fatalf("%v: %v", args, err)
@@ -104,7 +104,7 @@ func TestCLIReadsModelCapabilitiesAndSavedSelection(t *testing.T) {
 	home := isolatedHome(t)
 	put(t, filepath.Join(home, ".codex", "models_cache.json"), `{"fetched_at":"2026-10-01T00:00:00Z","models":[{"slug":"test-model","display_name":"Test Model","supported_reasoning_levels":[{"effort":"high","description":"Deep reasoning"}],"context_window":250000}]}`)
 	base := []string{"--home", home, "--project", home, "--no-probe", "--harness", "codex"}
-	out, _, err := runCLI(t, append([]string{"mo", "se", "test-model"}, base...)...)
+	out, _, err := runCLI(t, append([]string{"mo", "sel", "test-model"}, base...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,5 +273,25 @@ func TestUnknownWordIsNotFoundAndPluralsStillList(t *testing.T) {
 	}
 	if _, errOut, err := runCLI(t, append([]string{"skills"}, flags...)...); err != nil {
 		t.Fatalf("skills: %v\n%s", err, errOut)
+	}
+}
+
+// The inventory nouns are thing nouns over their list: get reads one row by
+// its id (over HOME, the standard get takes none of the collection flags;
+// show does), and a core verb the tool does not do (set) is unavailable.
+func TestListNounsAreThingNouns(t *testing.T) {
+	home := isolatedHome(t)
+	t.Setenv("HOME", home)
+	put(t, filepath.Join(home, ".codex", "models_cache.json"), `{"models":[{"slug":"test-model","display_name":"Test Model"}]}`)
+	out, _, err := runCLI(t, "model", "get", "model/codex:openai/test-model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(out), &got); err != nil || got["id"] != "model/codex:openai/test-model" || got["label"] == "" {
+		t.Fatalf("model get: %v %v", err, got)
+	}
+	if _, _, err := runCLI(t, "model", "set", "model/codex:openai/test-model"); err == nil {
+		t.Fatal("model set ran on a read-only noun")
 	}
 }

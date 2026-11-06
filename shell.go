@@ -287,6 +287,7 @@ func (t *Tool) shell() *ocli.Shell {
 	r.Operations["status.list"] = withParams(r.Operations["status.list"], merged(collectParams, formatParam))
 	r.Operations["status.show"] = withParams(r.Operations["status.show"], collectParams)
 	t.defineQuota(r, lists["quota"])
+	defineListStores(r, listed)
 	for noun, spec := range specs { // the nouns the state leaves out are declared live
 		if spec.live {
 			r.Define(noun).Live()
@@ -323,6 +324,15 @@ func (t *Tool) shell() *ocli.Shell {
 		return lists[noun].SetItems([]ochazuke.ListItem{{ID: target, Label: id, Noun: noun, Data: id}})
 	}
 	return sh
+}
+
+// defineListStores makes each inventory noun a thing noun over its list
+// verb (thing_store.go): get reads one row, and the other core verbs are on
+// the noun, unavailable. (quota's is declared with its verbs.)
+func defineListStores(r *ochazuke.Runtime, listed func(string, ochazuke.Arguments) ochazuke.Result) {
+	for _, noun := range append(append([]string{}, categories...), "status") {
+		listStore{Noun: noun, List: func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) }}.define(r)
+	}
 }
 
 // nounRows is one noun's rows from an inventory: the status counts, else

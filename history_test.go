@@ -74,8 +74,10 @@ func TestSettingsNounIsOAIsOwn(t *testing.T) {
 	if op, ok := r.Operation("settings.list"); !ok || op.Builtin {
 		t.Fatalf("settings.list is not o-ai's: %+v", op)
 	}
-	if _, ok := r.Operation("settings.set"); ok {
-		t.Fatal("settings.set reaches the framework's verb through o-ai's noun")
+	// settings is a thing noun (a facts store over its list), so its set is
+	// its own core verb, unavailable: not the framework's setting set.
+	if op, ok := r.Operation("settings.set"); !ok || op.Builtin || op.Unavailable == "" {
+		t.Fatalf("settings.set is not o-ai's own unavailable core verb: %+v", op)
 	}
 	if op, ok := r.Operation("setting.path"); !ok || !op.Builtin {
 		t.Fatalf("setting.path is not the framework's: %+v", op)
