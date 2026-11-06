@@ -1,0 +1,14 @@
+# nouncheck baseline: kind, noun, verb (tab separated), one row per accepted break of the thing and command noun rules.
+# It only shrinks: NOUNCHECK_UPDATE=1 removes rows that no longer match, never adds them. Adding a row is a reviewed edit.
+command-core-verb	agent	list
+command-core-verb	harness	list
+command-core-verb	mcp	list
+command-core-verb	mcp-tool	list
+command-core-verb	model	list
+command-core-verb	ochazuke.catalog	list
+command-core-verb	provider	list
+command-core-verb	quota	list
+command-core-verb	settings	list
+command-core-verb	skill	list
+command-core-verb	status	list
+command-core-verb	thinking	list

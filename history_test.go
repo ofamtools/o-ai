@@ -64,7 +64,7 @@ func TestVerbHistoryKinds(t *testing.T) {
 
 // TestSettingsNounIsOAIsOwn: o-ai's settings noun owns the short name
 // (DefineOwn), so `settings list` is the inventory kind's verb, and the
-// framework's settings verbs stay reachable as app.settings.
+// framework's setting verbs stay reachable as the setting noun.
 func TestSettingsNounIsOAIsOwn(t *testing.T) {
 	tool := &Tool{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard, Env: os.Environ(), Prog: "o-ai"}
 	r := tool.shell().Runtime
@@ -77,7 +77,7 @@ func TestSettingsNounIsOAIsOwn(t *testing.T) {
 	if _, ok := r.Operation("settings.set"); ok {
 		t.Fatal("settings.set reaches the framework's verb through o-ai's noun")
 	}
-	if op, ok := r.Operation("app.settings.path"); !ok || !op.Builtin {
-		t.Fatalf("app.settings.path is not the framework's: %+v", op)
+	if op, ok := r.Operation("setting.path"); !ok || !op.Builtin {
+		t.Fatalf("setting.path is not the framework's: %+v", op)
 	}
 }
