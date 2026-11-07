@@ -112,7 +112,7 @@ func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
 		}, "fetch the quota windows now, past the cache (rows as list; a harness the vendor refuses keeps its last good rows)").Rows("quota").Fetch().
 		Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaShow(c) },
 			"a harness's quota record (claude or codex; none prints both): plan, source, observedAt, windows, error").Fetch()
-	listStore{Noun: "quota", List: func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) }}.define(r)
+	r.DefineListFacts(ochazuke.ListFacts{Noun: "quota", List: func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) }})
 	listOp := withParams(r.Operations["quota.list"], merged(params, formatParam))
 	listOp.Positional = []string{"harness"} // quota list claude
 	r.Operations["quota.list"] = listOp

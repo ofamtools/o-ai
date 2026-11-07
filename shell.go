@@ -327,11 +327,11 @@ func (t *Tool) shell() *ocli.Shell {
 }
 
 // defineListStores makes each inventory noun a thing noun over its list
-// verb (thing_store.go): get reads one row, and the other core verbs are on
+// verb (Runtime.DefineListFacts): get reads one row, and the other core verbs are on
 // the noun, unavailable. (quota's is declared with its verbs.)
 func defineListStores(r *ochazuke.Runtime, listed func(string, ochazuke.Arguments) ochazuke.Result) {
 	for _, noun := range append(append([]string{}, categories...), "status") {
-		listStore{Noun: noun, List: func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) }}.define(r)
+		r.DefineListFacts(ochazuke.ListFacts{Noun: noun, List: func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) }})
 	}
 }
 
