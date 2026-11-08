@@ -237,17 +237,17 @@ func (t *Tool) shell() *ocli.Shell {
 			Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return result(t.show(noun, c, false)) },
 				"one "+noun+" record: ENTRY (an id, name, slug or path) or --target ROW_ID").Fetch()
 		params := merged(collectParams, filterParams, nounParams[noun])
-		r.Operations[noun+".list"] = withParams(r.Operations[noun+".list"], merged(params, formatParam))
-		r.Operations[noun+".show"] = withParams(r.Operations[noun+".show"], merged(params, entryParam))
+		r.Operations.Set(withParams(r.Operations.At(ochazuke.Key(noun+".list")), merged(params, formatParam)))
+		r.Operations.Set(withParams(r.Operations.At(ochazuke.Key(noun+".show")), merged(params, entryParam)))
 		if _, ok := nounParams[noun]["server"]; ok { // mcp tools tuios: a bare word after list is the server
-			op := r.Operations[noun+".list"]
+			op := r.Operations.At(ochazuke.Key(noun + ".list"))
 			op.Positional = []string{"server"}
-			r.Operations[noun+".list"] = op
+			r.Operations.Set(op)
 		}
 		if noun == "model" {
 			b.Verb("select", func(c ochazuke.Ctx) ochazuke.Result { return result(t.show(noun, c, true)) },
 				"save ENTRY as o-ai's model selection (~/.config/aiview/selection.json); model show with no ENTRY prints it")
-			r.Operations["model.select"] = withParams(r.Operations["model.select"], merged(params, entryParam))
+			r.Operations.Set(withParams(r.Operations.At("model.select"), merged(params, entryParam)))
 			// select writes the selection file: the one change o-ai makes.
 			setHistory(r, ochazuke.HistoryChange, "model.select")
 		}
@@ -267,9 +267,9 @@ func (t *Tool) shell() *ocli.Shell {
 			}
 			return listed("mcp-tool", args)
 		}, "the tools a server exposes, as a harness cached them (omp): mcp-tool rows of SERVER, --server or the --target mcp row's server").Rows("mcp-tool").Fetch()
-	tools := r.Operations["mcp.tools"]
-	tools.Parameters, tools.Positional = r.Operations["mcp-tool.list"].Parameters, r.Operations["mcp-tool.list"].Positional
-	r.Operations["mcp.tools"] = tools
+	tools := r.Operations.At("mcp.tools")
+	tools.Parameters, tools.Positional = r.Operations.At("mcp-tool.list").Parameters, r.Operations.At("mcp-tool.list").Positional
+	r.Operations.Set(tools)
 	r.Define("status").
 		Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return listed("status", c.Args) },
 			"how many records of each kind: {id, label, data: {kind, count}}").Rows("status").Fetch().
@@ -283,9 +283,9 @@ func (t *Tool) shell() *ocli.Shell {
 	r.Define("status").
 		Verb("state", func(c ochazuke.Ctx) ochazuke.Result { return result(t.state(c.Args)) },
 			"every list's rows in one collection, JSON Lines {noun, id, label, data: the brief record} for "+strings.Join(stateNouns(), ", ")+" (the catalog's state)").State().Fetch()
-	r.Operations["status.state"] = withParams(r.Operations["status.state"], merged(collectParams, filterParams))
-	r.Operations["status.list"] = withParams(r.Operations["status.list"], merged(collectParams, formatParam))
-	r.Operations["status.show"] = withParams(r.Operations["status.show"], collectParams)
+	r.Operations.Set(withParams(r.Operations.At("status.state"), merged(collectParams, filterParams)))
+	r.Operations.Set(withParams(r.Operations.At("status.list"), merged(collectParams, formatParam)))
+	r.Operations.Set(withParams(r.Operations.At("status.show"), collectParams))
 	t.defineQuota(r, lists["quota"])
 	defineListStores(r, listed)
 	for noun, spec := range specs { // the nouns the state leaves out are declared live
@@ -570,11 +570,11 @@ func isDir(path string) bool {
 // An unknown key panics, so a renamed verb is renamed here too.
 func setHistory(r *ochazuke.Runtime, kind string, keys ...string) {
 	for _, key := range keys {
-		op, ok := r.Operations[key]
+		op, ok := r.Operations.Find(ochazuke.Key(key))
 		if !ok {
 			panic("setHistory: no operation " + key)
 		}
 		op.HistoryKind = kind
-		r.Operations[key] = op
+		r.Operations.Set(op)
 	}
 }

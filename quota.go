@@ -113,23 +113,23 @@ func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
 		Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaShow(c) },
 			"a harness's quota record (claude or codex; none prints both): plan, source, observedAt, windows, error").Fetch()
 	r.DefineListFacts(ochazuke.ListFacts{Noun: "quota", List: func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) }})
-	listOp := withParams(r.Operations["quota.list"], merged(params, formatParam))
+	listOp := withParams(r.Operations.At("quota.list"), merged(params, formatParam))
 	listOp.Positional = []string{"harness"} // quota list claude
-	r.Operations["quota.list"] = listOp
+	r.Operations.Set(listOp)
 	// F on a quota row fetches now, past the cache. Free in ochazuke's
 	// defaults and in mtm's list keys (a and D are retired there; every
 	// other letter but B, F, H, M, Z is taken).
 	if err := r.Bind(ochazuke.Binding{Mode: "normal", Noun: "quota", Keys: "F", Request: ochazuke.Request{Noun: "quota", Verb: "refresh"}, Hint: "fetch quota now"}); err != nil {
 		panic(err)
 	}
-	refresh := withParams(r.Operations["quota.refresh"], merged(params, formatParam))
+	refresh := withParams(r.Operations.At("quota.refresh"), merged(params, formatParam))
 	refresh.Positional = []string{"harness"}
-	r.Operations["quota.refresh"] = refresh
-	show := withParams(r.Operations["quota.show"], merged(params, map[string]ochazuke.Parameter{
+	r.Operations.Set(refresh)
+	show := withParams(r.Operations.At("quota.show"), merged(params, map[string]ochazuke.Parameter{
 		"entry": {Type: "string", Enum: quotaHarnesses, Description: "claude or codex"},
 	}))
 	show.Positional = []string{"entry"}
-	r.Operations["quota.show"] = show
+	r.Operations.Set(show)
 }
 
 func (t *Tool) quotaList(args ochazuke.Arguments, list *ochazuke.List) ochazuke.Result {
