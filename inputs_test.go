@@ -53,7 +53,7 @@ func (w *stateWorld) fingerprint() (string, error) {
 // the cache id, each list's answer and hash, and the skill row ids.
 func (w *stateWorld) state(cache string, since map[string]string) (string, map[string]string, map[string]string, []string) {
 	w.t.Helper()
-	args := []string{"status", "state", "--json", `{"no-probe": true}`}
+	args := []string{"inventory", "lists", "--json", `{"no-probe": true}`}
 	if since == nil {
 		args = append(args, "--since=")
 	} else {

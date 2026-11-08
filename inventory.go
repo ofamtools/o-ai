@@ -130,7 +130,7 @@ type Entry struct {
 	Value    any
 }
 
-var categories = []string{"harness", "provider", "model", "thinking", "skill", "agent", "settings", "mcp", "mcp-tool"}
+var categories = []string{"harness", "provider", "model", "thinking", "skill", "agent", "setting", "mcp", "mcp-tool"}
 
 func (in Inventory) Entries(kind string, o Options) []Entry {
 	var rows []Entry
@@ -150,9 +150,9 @@ func (in Inventory) Entries(kind string, o Options) []Entry {
 		rows = append(rows, e)
 	}
 	switch kind {
-	case "harness", "settings":
+	case "harness", "setting":
 		for _, h := range in.Harnesses {
-			if kind == "settings" {
+			if kind == "setting" {
 				for _, s := range h.Settings {
 					add(Entry{ID: h.ID + ":" + s.Path, Name: s.Path, Harness: h.ID, Summary: s.Scope, Value: s})
 				}

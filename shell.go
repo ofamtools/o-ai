@@ -22,7 +22,7 @@ import (
 // its noun; show then finds the id in its own collection.
 
 // nouns are the runtime's nouns: the inventory kinds, status, then quota.
-var nouns = append(append([]string{}, categories...), "status", "quota")
+var nouns = append(append([]string{}, categories...), "inventory", "quota")
 
 // nounSpec is what a noun's verbs read: the bulky fields a list row's data
 // leaves out (multi-KB at the long tail; show still prints the whole
@@ -41,17 +41,17 @@ var catalogs = Need{Catalogs: true}
 // specs are the nouns' needs. Resource and settings lists read files only;
 // harness and status read everything, processes included.
 var specs = map[string]nounSpec{
-	"harness":  {omit: []string{"settings"}, brief: []string{"id", "installed", "configured", "executable", "processStatus", "catalogStatus"}, need: needAll},
-	"provider": {omit: []string{"models"}, brief: []string{"harness", "slug", "access"}, need: catalogs},
-	"model":    {omit: []string{"metadata"}, brief: []string{"harness", "provider", "name", "cliSlug"}, need: catalogs},
-	"thinking": {brief: []string{"slug", "harness", "provider", "cliSlug"}, need: catalogs},
-	"skill":    {omit: []string{"content"}, brief: resourceBrief},
-	"agent":    {omit: []string{"content"}, brief: resourceBrief, need: Need{RuntimeAgents: true}},
-	"settings": {brief: []string{"path", "scope", "error"}},
-	"mcp":      {brief: []string{"name", "harness", "scope", "transport", "command", "url", "disabled"}},
-	"mcp-tool": {omit: []string{"inputSchema"}, brief: []string{"server", "name", "description", "harness"}},
-	"status":   {need: needAll},
-	"quota":    {live: true},
+	"harness":   {omit: []string{"settings"}, brief: []string{"id", "installed", "configured", "executable", "processStatus", "catalogStatus"}, need: needAll},
+	"provider":  {omit: []string{"models"}, brief: []string{"harness", "slug", "access"}, need: catalogs},
+	"model":     {omit: []string{"metadata"}, brief: []string{"harness", "provider", "name", "cliSlug"}, need: catalogs},
+	"thinking":  {brief: []string{"slug", "harness", "provider", "cliSlug"}, need: catalogs},
+	"skill":     {omit: []string{"content"}, brief: resourceBrief},
+	"agent":     {omit: []string{"content"}, brief: resourceBrief, need: Need{RuntimeAgents: true}},
+	"setting":   {brief: []string{"path", "scope", "error"}},
+	"mcp":       {brief: []string{"name", "harness", "scope", "transport", "command", "url", "disabled"}},
+	"mcp-tool":  {omit: []string{"inputSchema"}, brief: []string{"server", "name", "description", "harness"}},
+	"inventory": {need: needAll},
+	"quota":     {live: true},
 }
 
 var resourceBrief = []string{"name", "description", "path", "harnesses", "scope", "source"}
@@ -128,8 +128,8 @@ type Row struct {
 	Cells []string `json:"cells,omitempty"`
 }
 
-// StatusCount is a status row's data: how many records of a kind.
-type StatusCount struct {
+// KindCount is a status row's data: how many records of a kind.
+type KindCount struct {
 	Kind  string `json:"kind"`
 	Count int    `json:"count"`
 }
@@ -187,7 +187,7 @@ func (t *Tool) shell() *ocli.Shell {
 	for _, noun := range nouns {
 		r.DefineOwn(noun)
 	}
-	lists := map[string]*ochazuke.List{}
+	lists := map[string]*ochazuke.Collection{}
 	for _, noun := range nouns {
 		list, err := r.AddList("list/"+noun, nil)
 		if err != nil {
@@ -270,22 +270,22 @@ func (t *Tool) shell() *ocli.Shell {
 	tools := r.Operations.At("mcp.tools")
 	tools.Parameters, tools.Positional = r.Operations.At("mcp-tool.list").Parameters, r.Operations.At("mcp-tool.list").Positional
 	r.Operations.Set(tools)
-	r.Define("status").
-		Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return listed("status", c.Args) },
-			"how many records of each kind: {id, label, data: {kind, count}}").Rows("status").Fetch().
+	r.Define("inventory").Main(). // the tool's main noun: `o-ai list` is `inventory list`, the default view
+					Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return listed("inventory", c.Args) },
+			"how many records of each kind: {id, label, data: {kind, count}}").Rows("inventory").Fetch().
 		Verb("show", func(c ochazuke.Ctx) ochazuke.Result {
 			o, _, err := t.options(c.Args)
 			if err != nil {
 				return ochazuke.Failed(err)
 			}
-			return ochazuke.Done(t.inventory(o, specs["status"].need))
+			return ochazuke.Done(t.inventory(o, specs["inventory"].need))
 		}, "the whole inventory, warnings included").Fetch()
-	r.Define("status").
-		Verb("state", func(c ochazuke.Ctx) ochazuke.Result { return result(t.state(c.Args)) },
-			"every list's rows in one collection, JSON Lines {noun, id, label, data: the brief record} for "+strings.Join(stateNouns(), ", ")+" (the catalog's state)").State().Fetch()
-	r.Operations.Set(withParams(r.Operations.At("status.state"), merged(collectParams, filterParams)))
-	r.Operations.Set(withParams(r.Operations.At("status.list"), merged(collectParams, formatParam)))
-	r.Operations.Set(withParams(r.Operations.At("status.show"), collectParams))
+	r.Define("inventory").
+		Verb("lists", func(c ochazuke.Ctx) ochazuke.Result { return result(t.state(c.Args)) },
+			"every list's rows in one collection, JSON Lines {noun, id, label, data: the brief record} for "+strings.Join(stateNouns(), ", ")+" (the catalog's state source)").Lists().Fetch()
+	r.Operations.Set(withParams(r.Operations.At("inventory.lists"), merged(collectParams, filterParams)))
+	r.Operations.Set(withParams(r.Operations.At("inventory.list"), merged(collectParams, formatParam)))
+	r.Operations.Set(withParams(r.Operations.At("inventory.show"), collectParams))
 	t.defineQuota(r, lists["quota"])
 	defineListStores(r, listed)
 	for noun, spec := range specs { // the nouns the state leaves out are declared live
@@ -330,7 +330,7 @@ func (t *Tool) shell() *ocli.Shell {
 // verb (Runtime.DefineListFacts): get reads one row, and the other core verbs are on
 // the noun, unavailable. (quota's is declared with its verbs.)
 func defineListStores(r *ochazuke.Runtime, listed func(string, ochazuke.Arguments) ochazuke.Result) {
-	for _, noun := range append(append([]string{}, categories...), "status") {
+	for _, noun := range append(append([]string{}, categories...), "inventory") {
 		r.DefineListFacts(ochazuke.ListFacts{Noun: noun, List: func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) }})
 	}
 }
@@ -348,8 +348,8 @@ func nounRows(noun string, in Inventory, o Options, model string, shape func(str
 		}
 		rows = append(rows, row)
 	}
-	if noun == "status" {
-		for _, c := range statusCounts(in) {
+	if noun == "inventory" {
+		for _, c := range kindCounts(in) {
 			add(c.Kind, fmt.Sprintf("%s: %d", c.Kind, c.Count), c)
 		}
 	} else {
@@ -425,8 +425,8 @@ func label(noun string, e Entry) string {
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-func statusCounts(in Inventory) []StatusCount {
-	return []StatusCount{
+func kindCounts(in Inventory) []KindCount {
+	return []KindCount{
 		{"harnesses", len(in.Harnesses)}, {"providers", len(in.Providers)}, {"models", len(in.Models)},
 		{"skills", len(in.Skills)}, {"agents", len(in.Agents)}, {"mcps", len(in.MCPServers)}, {"mcp-tools", len(in.MCPTools)},
 		{"warnings", len(in.Warnings)},

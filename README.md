@@ -41,11 +41,11 @@ mtm ai skill list    # through mtm (its second lookup prefix is o)
 A first look, over the invented setup the demo uses (two Claude Code skills and an agent, Claude and Codex settings, an MCP server each; [docs/vhs](docs/vhs)). Every verb prints JSON; lists are rows of `{id, label, data, cells}`:
 
 ```console
-$ o ai status list
+$ o ai inventory list
 [
-  {"id":"status/harnesses","label":"harnesses: 7","data":{"kind":"harnesses","count":7},"cells":["harnesses","7"]},
-  {"id":"status/providers","label":"providers: 2","data":{"kind":"providers","count":2},"cells":["providers","2"]},
-  {"id":"status/models","label":"models: 2","data":{"kind":"models","count":2},"cells":["models","2"]},
+  {"id":"inventory/harnesses","label":"harnesses: 7","data":{"kind":"harnesses","count":7},"cells":["harnesses","7"]},
+  {"id":"inventory/providers","label":"providers: 2","data":{"kind":"providers","count":2},"cells":["providers","2"]},
+  {"id":"inventory/models","label":"models: 2","data":{"kind":"models","count":2},"cells":["models","2"]},
   ...
 ]
 $ o ai mcp list | jq -c '.[0]'
@@ -79,10 +79,10 @@ The nouns are an ochazuke runtime behind `ochazuke/cli`: `o ai NOUN VERB [ENTRY]
 | `thinking` | list, show | the level with `model`, `cliSlug`, `launchArgs` |
 | `skill` | list, show | `Resource` (path, resolvedPath, frontmatter; content in show) |
 | `agent` | list, show | `Resource` |
-| `settings` | list, show | `Setting` |
+| `setting` | list, show | `Setting` |
 | `mcp` | list, show, tools | a configured MCP server: `harness`, `scope`, `config`, `transport`, `command`, `args`, `url`, env and header names (below) |
 | `mcp-tool` | list, show | a tool a harness cached for a server: `server`, `name`, `description`; `inputSchema` in show |
-| `status` | list, show, state | list: counts per kind; show: the whole inventory; state: every list at once (below) |
+| `inventory` | list, show, lists | list: counts per kind; show: the whole inventory; lists: every list at once (below) |
 | `quota` | list, show | a rate-limit window: `usedPercent`, `remainingPercent`, `resetsAt` (below) |
 
 ```sh
@@ -95,12 +95,12 @@ o ai model show                       # the saved selection
 o ai skill list --search review
 o ai skill show --target skill/skill:claude:/Users/me/.claude/skills/review/SKILL.md
 o ai skills                           # a plural is NOUN list
-o ai status show                      # the full inventory, warnings included
-o ai status state                     # every noun's rows from one collection, JSON Lines (the catalog's state)
+o ai inventory show                   # the full inventory, warnings included
+o ai inventory lists                  # every noun's rows from one collection, JSON Lines (the catalog's state source)
 o ai skill list --format jsonl        # one {noun, id, label, data} per line
 o ai mcps                             # every configured MCP server of every harness
 o ai mcp tools tuios                  # the tuios server's tools (mcp-tool list tuios)
-o ai                                  # status list
+o ai                                  # inventory list
 o ai catalog                          # the nouns and verbs, for a host
 ```
 
@@ -156,7 +156,7 @@ Claude's windows are the usage answer's `limits` (`session`, `weekly_all`, `week
 | --- | --- |
 | `aiview model list --harness omp` | `o ai model list --harness omp` |
 | `aiview list model`, `aiview show model ID` | `o ai model list`, `o ai model show ID` (the verb-first spelling is gone) |
-| `aiview status`, `aiview status --json` | `o ai status list` (counts), `o ai status show` (the inventory) |
+| `aiview status`, `aiview status --json` | `o ai inventory list` (counts), `o ai inventory show` (the inventory) |
 | `aiview NOUN list --json` (array of records) | `o ai NOUN list` (rows; each record is a row's `data`) |
 | `--json` (JSON output) | gone: output is always JSON; `--json` now takes the parameters as an object |
 | flags before the command words | flags after NOUN VERB |
@@ -189,9 +189,9 @@ and `show` prints the whole record alone, unchanged from aiview. A row of a tabl
 | mcp | server, harness, scope, transport, command (with its args, or the url) |
 | mcp-tool | tool, server, description |
 | quota | harness, window, used, left, resets (local time) |
-| status | kind, count |
+| inventory | kind, count |
 
-thinking and settings rows have no cells (a plain list of labels). The same cells are on `--format jsonl` lines and the state's rows. A list row's `data` is that record without its bulky fields, so a list stays small: skill and agent drop `content`, model `metadata`, harness `settings` (the settings noun lists them), provider `models` (`specs` in `shell.go`).
+thinking and setting rows have no cells (a plain list of labels). The same cells are on `--format jsonl` lines and the state's rows. A list row's `data` is that record without its bulky fields, so a list stays small: skill and agent drop `content`, model `metadata`, harness `settings` (the settings noun lists them), provider `models` (`specs` in `shell.go`).
 
 ### The inventory cache
 
@@ -208,10 +208,10 @@ A model's stable inventory ID includes its harness and provider, such as `omp:op
 `status state` is the catalog's state source (`"state": "status.state"`, the ochazuke/cli convention): one process, one collection covering every noun's need, processes inspected once, answering every list as JSON Lines, one row per line tagged with its noun, no outer array:
 
 ```js
-// o ai status state
+// o ai inventory lists
 {"noun":"harness","id":"harness/claude","label":"claude","data":{"id":"claude","installed":true,"configured":true,"executable":"/Users/me/.local/bin/claude","processStatus":"3 running processes (including helpers)","catalogStatus":"live initialization metadata"}}
 {"noun":"skill","id":"skill/skill:claude:/Users/me/.claude/skills/review/SKILL.md","label":"review [claude]","data":{"name":"review","description":"Review a diff…","path":"/Users/me/.claude/skills/review/SKILL.md","harnesses":["claude"],"scope":"Claude user"}}
-// ... every row of harness, provider, model, thinking, skill, agent, settings, status
+// ... every row of harness, provider, model, thinking, skill, agent, setting, inventory
 ```
 
 A state row's `data` is the record's brief fields (`specs[noun].brief` in `shell.go`), enough for a host to draw a row's details without a `show`, which still prints the whole record:
@@ -223,7 +223,7 @@ A state row's `data` is the record's brief fields (`specs[noun].brief` in `shell
 | model | `harness`, `provider`, `name`, `cliSlug` |
 | thinking | `slug`, `harness`, `provider`, `cliSlug` (the model is the row id without `:SLUG`) |
 | skill, agent | `name`, `description` (one line, cut to 160 characters with `…`), `path`, `harnesses`, `scope`, `source` |
-| settings | `path`, `scope`, `error` |
+| setting | `path`, `scope`, `error` |
 | status | `kind`, `count` |
 
 On the owner's machine (8,262 rows) the answer is 2.35 MB, against 1.02 MB with ids and labels only and 5.4 MB for the eight lists' lean records. A noun with no records has no lines. `NOUN list --format jsonl` prints the same line shape with `data` (the default `json` stays an array). nabe runs `status state` once at startup, then on its refresh interval, after a verb of the extension and on `extension refresh` (with `--fresh`), instead of eight `NOUN list` processes.

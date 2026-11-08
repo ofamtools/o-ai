@@ -90,7 +90,7 @@ type QuotaWindow struct {
 	key string // the row id's window part
 }
 
-func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
+func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.Collection) {
 	params := map[string]ochazuke.Parameter{
 		"harness": {Type: "string", Enum: quotaHarnesses, Description: "only this harness: claude or codex"},
 		"home":    collectParams["home"],
@@ -132,7 +132,7 @@ func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.List) {
 	r.Operations.Set(show)
 }
 
-func (t *Tool) quotaList(args ochazuke.Arguments, list *ochazuke.List) ochazuke.Result {
+func (t *Tool) quotaList(args ochazuke.Arguments, list *ochazuke.Collection) ochazuke.Result {
 	o, _, err := t.options(args)
 	if err != nil {
 		return ochazuke.Failed(err)

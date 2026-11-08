@@ -36,7 +36,7 @@ var resourceTable = table{
 
 var tables = map[string]table{
 	"harness": {
-		columns: []ochazuke.Column{{Title: "harness", Min: 8}, {Title: "state", Priority: 1}, {Title: "procs", Align: ochazuke.AlignRight, Priority: 2}, {Title: "catalog", Priority: 3}, {Title: "executable", Priority: 4}},
+		columns: []ochazuke.Column{{Title: "harness", Min: 8}, {Title: "status", Priority: 1}, {Title: "procs", Align: ochazuke.AlignRight, Priority: 2}, {Title: "catalog", Priority: 3}, {Title: "executable", Priority: 4}},
 		cells: func(v any) []string {
 			h, _ := v.(Harness)
 			state := "missing"
@@ -90,10 +90,10 @@ var tables = map[string]table{
 			return []string{t.Name, t.Server, cut(t.Description)}
 		},
 	},
-	"status": {
+	"inventory": {
 		columns: []ochazuke.Column{{Title: "kind", Min: 10}, {Title: "count", Align: ochazuke.AlignRight}},
 		cells: func(v any) []string {
-			c, _ := v.(StatusCount)
+			c, _ := v.(KindCount)
 			return []string{c.Kind, strconv.Itoa(c.Count)}
 		},
 	},

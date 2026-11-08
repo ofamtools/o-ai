@@ -10,7 +10,7 @@
 //	o-ai NOUN show ENTRY|--target ID
 //	o-ai model select ENTRY
 //	o-ai mcp tools [SERVER]          the tools omp cached for a server
-//	o-ai status show                 the whole inventory
+//	o-ai inventory show                the whole inventory
 //	o-ai quota list [claude|codex]   rate-limit windows: % used, % left, resets
 //	o-ai quota show [claude|codex]   a harness's quota record
 //	o-ai NOUNs                       NOUN list (o-ai skills, o-ai models)
@@ -77,7 +77,7 @@ func progName(getenv func(string) string) string {
 
 // Main runs one command: a noun of the runtime (oden resolves a unique
 // prefix, the shell a verb's), catalog, an oden builtin, or by default a
-// plural noun (skills is skill list) and, with no words, status list; any
+// plural noun (skills is skill list) and, with no words, inventory list; any
 // other word is oden's not found report.
 func (t *Tool) Main(ctx context.Context, args []string) error {
 	app := oden.New("o-ai", args, oden.WithBuiltins(), oden.WithStdio(t.Stdin, t.Stdout, t.Stderr), oden.WithEnv(t.Env))
@@ -88,7 +88,7 @@ func (t *Tool) Main(ctx context.Context, args []string) error {
 	app.Add()
 	app.Default = func(ctx context.Context, args []string) error {
 		if len(args) == 0 {
-			return sh.Run(ctx, []string{"status", "list"})
+			return sh.Run(ctx, []string{"inventory", "list"})
 		}
 		if noun := plural(args[0]); noun != "" {
 			rest := args[1:]

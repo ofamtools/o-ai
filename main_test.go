@@ -196,7 +196,7 @@ func TestJSONCAndTOMLSettings(t *testing.T) {
 	home := isolatedHome(t)
 	put(t, filepath.Join(home, ".claude", "settings.json"), "{ // user's selected model\n\"model\": \"opus\", \"env\": {\"API_KEY\": \"secret-fixture\"}, }")
 	put(t, filepath.Join(home, ".codex", "config.toml"), "model = 'custom'\n[model_providers.local]\nbase_url = 'http://localhost:8080/v1'\napi_key = 'local-private'\n")
-	out, _, err := runCLI(t, "settings", "list", "--home", home, "--project", home, "--no-probe")
+	out, _, err := runCLI(t, "setting", "list", "--home", home, "--project", home, "--no-probe")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestInvalidConfigurationRemainsInspectable(t *testing.T) {
 	home := isolatedHome(t)
 	path := filepath.Join(home, ".claude", "settings.json")
 	put(t, path, `{"model":"opus" "apiKey":"do-not-expose"}`)
-	out, warnings, err := runCLI(t, "settings", "list", "--home", home, "--project", home, "--no-probe")
+	out, warnings, err := runCLI(t, "setting", "list", "--home", home, "--project", home, "--no-probe")
 	if err != nil {
 		t.Fatal(err)
 	}

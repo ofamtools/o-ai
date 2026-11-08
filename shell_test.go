@@ -56,7 +56,7 @@ func TestCatalogDeclaresRowsForEveryNoun(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"state": "status.state"`) {
+	if !strings.Contains(out, `"state": "inventory.lists"`) {
 		t.Errorf("catalog names no state source:\n%.300s", out)
 	}
 	if doc.Schema != 1 || doc.Name != "o-ai" {
@@ -139,12 +139,12 @@ func TestSkillRowsShowByTargetAndName(t *testing.T) {
 func TestStatusRows(t *testing.T) {
 	home := isolatedHome(t)
 	put(t, filepath.Join(home, ".claude", "skills", "one", "SKILL.md"), "---\nname: one\ndescription: d\n---\n")
-	out, _, err := runCLI(t, "status", "list", "--home", home, "--project", home, "--no-probe")
+	out, _, err := runCLI(t, "inventory", "list", "--home", home, "--project", home, "--no-probe")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows, counts := rowsOf[StatusCount](t, out)
-	if len(rows) != 8 || rows[3].ID != "status/skills" || counts[3].Count < 1 {
+	rows, counts := rowsOf[KindCount](t, out)
+	if len(rows) != 8 || rows[3].ID != "inventory/skills" || counts[3].Count < 1 {
 		t.Fatalf("status rows: %s", out)
 	}
 }
@@ -170,7 +170,7 @@ func TestBriefKeepsTheNounsKeys(t *testing.T) {
 	if !strings.HasPrefix(desc, "two lines word") || !strings.HasSuffix(desc, "…") || len([]rune(desc)) != briefText {
 		t.Fatalf("brief description %q (%d runes)", desc, len([]rune(desc)))
 	}
-	if got, _ := brief("status", StatusCount{"skills", 2}); got.(StatusCount).Count != 2 {
+	if got, _ := brief("inventory", KindCount{"skills", 2}); got.(KindCount).Count != 2 {
 		t.Fatalf("brief status %+v", got)
 	}
 }

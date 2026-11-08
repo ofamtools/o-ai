@@ -1,0 +1,14 @@
+kind	old	new	note
+noun	ai.settings	ai.setting	plural noun is singular; o-ai's noun keeps the short name over the framework's ochazuke.setting (DefineOwn); row ids settings/HARNESS:PATH are setting/...; CLI `o-ai setting list|show` (the plural word `settings` still reaches it through the plural shortcut)
+noun	ai.status	ai.inventory	the status type (per-kind counts rows {kind,count}, the whole-inventory show, the state source) is the inventory: not folded into a status prop (see note below); row ids status/KIND are inventory/KIND
+verb	ai.status.list	ai.inventory.list	counts per kind
+verb	ai.status.show	ai.inventory.show	the whole inventory, warnings included
+verb	ai.status.state	ai.inventory.lists	every list's rows (the catalog's state source, Result lists); a host finds it by Result, not by name
+cli	o-ai (no words) = status list	o-ai (no words) = inventory list	the default view; inventory is the main noun
+column	harness column state	status	the harness table column
+go	StatusCount, statusCounts	KindCount, kindCounts	the rows of the inventory noun
+noun	ai.inventory (main)	ai.inventory	declared the main noun (`o-ai list` is `inventory list`)
+lexiconcheck	words	testdata/lexicon-words.tsv	unchanged copy of the family list; baseline empty
+note	status as a prop	(not done)	ai.status was a rows noun (per-kind counts), not a type describing one thing; making the counts a count collection prop on each kind noun would drop the rows the page and the default view list, so the noun was renamed (inventory) instead; owner decision if a per-noun count prop is wanted
+go	ochazuke.List	ochazuke.Collection	framework v0.104.0 (not used here)
+data	stored state keys	(none)	o-ai stores the inventory and state caches only (regenerated); no stored `state` key, so no data migration

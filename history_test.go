@@ -52,8 +52,8 @@ func TestVerbHistoryKinds(t *testing.T) {
 	tool := &Tool{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard, Env: os.Environ(), Prog: "o-ai"}
 	ops := &tool.shell().Runtime.Operations
 	for key, want := range map[string]string{
-		"skill.list": ochazuke.HistoryFetch, "model.show": ochazuke.HistoryFetch, "status.state": ochazuke.HistoryFetch,
-		"status.show": ochazuke.HistoryFetch, "settings.list": ochazuke.HistoryFetch, "quota.show": ochazuke.HistoryFetch, "mcp.tools": ochazuke.HistoryFetch,
+		"skill.list": ochazuke.HistoryFetch, "model.show": ochazuke.HistoryFetch, "inventory.lists": ochazuke.HistoryFetch,
+		"inventory.show": ochazuke.HistoryFetch, "setting.list": ochazuke.HistoryFetch, "quota.show": ochazuke.HistoryFetch, "mcp.tools": ochazuke.HistoryFetch,
 		"model.select": ochazuke.HistoryChange,
 	} {
 		if got := ops.At(ochazuke.Key(key)).HistoryKind; got != want {
@@ -68,18 +68,18 @@ func TestVerbHistoryKinds(t *testing.T) {
 func TestSettingsNounIsOAIsOwn(t *testing.T) {
 	tool := &Tool{Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard, Env: os.Environ(), Prog: "o-ai"}
 	r := tool.shell().Runtime
-	if got := r.CanonicalNoun("settings"); got != "settings" {
-		t.Fatalf("settings resolves to %q, want o-ai's own", got)
+	if got := r.CanonicalNoun("setting"); got != "setting" {
+		t.Fatalf("setting resolves to %q, want o-ai's own", got)
 	}
-	if op, ok := r.Operation("settings.list"); !ok || op.Builtin {
-		t.Fatalf("settings.list is not o-ai's: %+v", op)
+	if op, ok := r.Operation("setting.list"); !ok || op.Builtin {
+		t.Fatalf("setting.list is not o-ai's: %+v", op)
 	}
 	// settings is a thing noun (a facts store over its list), so its set is
 	// its own core verb, unavailable: not the framework's setting set.
-	if op, ok := r.Operation("settings.set"); !ok || op.Builtin || op.Unavailable == "" {
-		t.Fatalf("settings.set is not o-ai's own unavailable core verb: %+v", op)
+	if op, ok := r.Operation("setting.set"); !ok || op.Builtin || op.Unavailable == "" {
+		t.Fatalf("setting.set is not o-ai's own unavailable core verb: %+v", op)
 	}
-	if op, ok := r.Operation("setting.path"); !ok || !op.Builtin {
-		t.Fatalf("setting.path is not the framework's: %+v", op)
+	if op, ok := r.Operation("ochazuke.setting.list"); !ok || !op.Builtin {
+		t.Fatalf("ochazuke.setting.list is not the framework's: %+v", op)
 	}
 }

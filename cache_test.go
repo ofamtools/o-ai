@@ -143,7 +143,7 @@ func TestCorruptCacheRecollects(t *testing.T) {
 func TestStateAnswersEveryListInOneCollection(t *testing.T) {
 	w := newCacheWorld(t)
 	state := map[string][]map[string]any{}
-	for _, line := range strings.Split(strings.TrimSpace(w.run("status", "state")), "\n") {
+	for _, line := range strings.Split(strings.TrimSpace(w.run("inventory", "lists")), "\n") {
 		var row map[string]any
 		if err := json.Unmarshal([]byte(line), &row); err != nil {
 			t.Fatalf("%v: %q", err, line)
@@ -156,7 +156,7 @@ func TestStateAnswersEveryListInOneCollection(t *testing.T) {
 	}
 	// A noun with no records has no lines; the fake inventory has a skill
 	// and the status counts.
-	if len(state) != 2 || len(state["status"]) != 8 {
+	if len(state) != 2 || len(state["inventory"]) != 8 {
 		t.Fatalf("state nouns %v", state)
 	}
 	if rows := state["skill"]; len(rows) != 1 || rows[0]["id"] != "skill/skill:claude:/s/SKILL.md" || rows[0]["label"] != "s [claude]" {
@@ -166,14 +166,14 @@ func TestStateAnswersEveryListInOneCollection(t *testing.T) {
 	if data["name"] != "s" || data["path"] != "/s/SKILL.md" || data["content"] != nil || data["kind"] != nil {
 		t.Fatalf("a state skill row's data is its brief record: %+v", data)
 	}
-	if data, _ := state["status"][3]["data"].(map[string]any); data["kind"] != "skills" || data["count"] != 1.0 {
-		t.Fatalf("a state status row's data is its count: %+v", state["status"][3])
+	if data, _ := state["inventory"][3]["data"].(map[string]any); data["kind"] != "skills" || data["count"] != 1.0 {
+		t.Fatalf("a state status row's data is its count: %+v", state["inventory"][3])
 	}
 	out := w.run("skill", "list", "--format", "jsonl") // covered by the state's collection
 	if !strings.HasPrefix(out, `{"noun":"skill","id":"skill/skill:claude:/s/SKILL.md","label":"s [claude]","data":{`) || !strings.Contains(out, `"path":"/s/SKILL.md"`) || strings.Count(out, "\n") != 1 {
 		t.Fatalf("list --format jsonl: %q", out)
 	}
-	w.run("status", "state", "--fresh")
+	w.run("inventory", "lists", "--fresh")
 	if len(w.needs) != 2 {
 		t.Fatalf("list after state, then state --fresh: %d collections", len(w.needs))
 	}

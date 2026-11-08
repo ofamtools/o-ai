@@ -8,11 +8,11 @@ inventory.go	Inventory.Entries	case	"mcp"	1
 inventory.go	Inventory.Entries	case	"mcp-tool"	1
 inventory.go	Inventory.Entries	case	"model"	1
 inventory.go	Inventory.Entries	case	"provider"	1
-inventory.go	Inventory.Entries	case	"settings"	1
+inventory.go	Inventory.Entries	case	"setting"	1
 inventory.go	Inventory.Entries	case	"skill"	1
 inventory.go	Inventory.Entries	case	"thinking"	1
 inventory.go	Inventory.Entries	compare	"agent"	1
-inventory.go	Inventory.Entries	compare	"settings"	1
+inventory.go	Inventory.Entries	compare	"setting"	1
 inventory.go	Inventory.Entries	cyclo	"-"	28
 quota.go	Tool.quotaShow	compare	"quota"	1
 resources.go	collector.discoverResources	compare	"skill"	1
@@ -25,7 +25,7 @@ shell.go	Tool.shell	cyclo	"-"	27
 shell.go	Tool.show	compare	"model"	1
 shell.go	label	compare	"harness"	1
 shell.go	label	compare	"thinking"	1
-shell.go	nounRows	compare	"status"	1
+shell.go	nounRows	compare	"inventory"	1
 shell.go	var specs	table	"agent"	1
 shell.go	var specs	table	"harness"	1
 shell.go	var specs	table	"mcp"	1
@@ -33,9 +33,9 @@ shell.go	var specs	table	"mcp-tool"	1
 shell.go	var specs	table	"model"	1
 shell.go	var specs	table	"provider"	1
 shell.go	var specs	table	"quota"	1
-shell.go	var specs	table	"settings"	1
+shell.go	var specs	table	"setting"	1
 shell.go	var specs	table	"skill"	1
-shell.go	var specs	table	"status"	1
+shell.go	var specs	table	"inventory"	1
 shell.go	var specs	table	"thinking"	1
 table.go	var tables	table	"agent"	1
 table.go	var tables	table	"harness"	1
@@ -45,4 +45,4 @@ table.go	var tables	table	"model"	1
 table.go	var tables	table	"provider"	1
 table.go	var tables	table	"quota"	1
 table.go	var tables	table	"skill"	1
-table.go	var tables	table	"status"	1
+table.go	var tables	table	"inventory"	1

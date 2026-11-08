@@ -308,7 +308,7 @@ func TestQuotaListOneHarnessAnswering(t *testing.T) {
 
 func TestStateLeavesOutQuota(t *testing.T) {
 	home := isolatedHome(t)
-	out, _, err := runCLI(t, "status", "state", "--home", home, "--project", home, "--no-probe")
+	out, _, err := runCLI(t, "inventory", "lists", "--home", home, "--project", home, "--no-probe")
 	if err != nil {
 		t.Fatal(err)
 	}

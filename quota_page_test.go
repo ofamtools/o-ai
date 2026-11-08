@@ -32,13 +32,13 @@ func TestHostedQuotaListFillsThroughItsVerb(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc.Pages = []ocli.CatalogPage{{ID: "ai", Title: "AI", Layout: ocli.LayoutGroups, Lists: []ocli.CatalogList{
-		{ID: "ai/settings", Noun: "settings"}, {ID: "ai/quota", Noun: "quota"},
+		{ID: "ai/setting", Noun: "setting"}, {ID: "ai/quota", Noun: "quota"},
 	}}}
 	var calls []string
 	fetch := func(_ context.Context, noun, verb string, flags []string) ([]byte, error) {
 		calls = append(calls, noun+"."+verb)
 		args := append([]string{noun, verb}, flags...)
-		if noun == "status" {
+		if noun == "inventory" {
 			args = append(args, "--no-probe", "--project", w.home)
 		}
 		out, err := w.run(args...)

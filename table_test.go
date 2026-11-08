@@ -36,22 +36,22 @@ func TestCatalogDeclaresColumns(t *testing.T) {
 		}
 	}
 	want := map[string][]string{
-		"skill":    {"name", "source", "scope", "description"},
-		"agent":    {"name", "source", "scope", "description"},
-		"model":    {"model", "harness", "provider", "context", "thinking"},
-		"harness":  {"harness", "state", "procs", "catalog", "executable"},
-		"provider": {"provider", "harness", "models", "access"},
-		"mcp":      {"server", "harness", "scope", "transport", "command"},
-		"mcp-tool": {"tool", "server", "description"},
-		"quota":    {"harness", "window", "used", "left", "resets"},
-		"status":   {"kind", "count"},
+		"skill":     {"name", "source", "scope", "description"},
+		"agent":     {"name", "source", "scope", "description"},
+		"model":     {"model", "harness", "provider", "context", "thinking"},
+		"harness":   {"harness", "status", "procs", "catalog", "executable"},
+		"provider":  {"provider", "harness", "models", "access"},
+		"mcp":       {"server", "harness", "scope", "transport", "command"},
+		"mcp-tool":  {"tool", "server", "description"},
+		"quota":     {"harness", "window", "used", "left", "resets"},
+		"inventory": {"kind", "count"},
 	}
 	for noun, w := range want {
 		if !slices.Equal(titles[noun], w) {
 			t.Errorf("%s columns %v, want %v", noun, titles[noun], w)
 		}
 	}
-	for _, noun := range []string{"thinking", "settings"} {
+	for _, noun := range []string{"thinking", "setting"} {
 		if titles[noun] != nil {
 			t.Errorf("%s has columns %v", noun, titles[noun])
 		}
@@ -74,7 +74,7 @@ func TestRowsCarryCellsPerColumn(t *testing.T) {
 	tool := &Tool{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errOut, Env: append(os.Environ(), "XDG_CACHE_HOME="+t.TempDir()), Home: isolatedHome(t), Prog: "o-ai",
 		collect: func(Options, Need) Inventory { return in }}
 	tool.Cwd = tool.Home
-	if err := tool.Main(context.Background(), []string{"status", "state", "--no-probe"}); err != nil {
+	if err := tool.Main(context.Background(), []string{"inventory", "lists", "--no-probe"}); err != nil {
 		t.Fatal(err, errOut.String())
 	}
 	cells := map[string][]string{}
@@ -101,21 +101,21 @@ func TestRowsCarryCellsPerColumn(t *testing.T) {
 		}
 	}
 	for noun, want := range map[string][]string{
-		"harness":  {"claude", "installed", procs, "live", "/bin/claude"},
-		"provider": {"anthropic", "claude", "1", "listed"},
-		"model":    {"M", "omp", "p", "200k", "low,high"},
-		"skill":    {"s", "ai-tools", "source", "does things"},
-		"agent":    {"a", "claude,omp", "user", ""},
-		"mcp":      {"tuios", "claude", "user", "stdio", "tuios mcp"},
-		"mcp-tool": {"send", "tuios", "Type"},
-		"status":   {"harnesses", "1"},
+		"harness":   {"claude", "installed", procs, "live", "/bin/claude"},
+		"provider":  {"anthropic", "claude", "1", "listed"},
+		"model":     {"M", "omp", "p", "200k", "low,high"},
+		"skill":     {"s", "ai-tools", "source", "does things"},
+		"agent":     {"a", "claude,omp", "user", ""},
+		"mcp":       {"tuios", "claude", "user", "stdio", "tuios mcp"},
+		"mcp-tool":  {"send", "tuios", "Type"},
+		"inventory": {"harnesses", "1"},
 	} {
 		if !slices.Equal(cells[noun], want) {
 			t.Errorf("%s cells %q, want %q", noun, cells[noun], want)
 		}
 	}
-	if _, ok := cells["thinking"]; !ok || cells["thinking"] != nil || cells["settings"] != nil {
-		t.Errorf("thinking and settings rows carry no cells: %v %v", cells["thinking"], cells["settings"])
+	if _, ok := cells["thinking"]; !ok || cells["thinking"] != nil || cells["setting"] != nil {
+		t.Errorf("thinking and settings rows carry no cells: %v %v", cells["thinking"], cells["setting"])
 	}
 
 	out.Reset()
