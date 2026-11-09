@@ -91,10 +91,8 @@ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-ofam.dev/ochazuke v0.102.0 h1:2rL2qGnRa1tWjZ2Fl0LXmi+Bj9lkjK5Dklfr1g4PCzc=
-ofam.dev/ochazuke v0.102.0/go.mod h1:89PFf8FkD+wkKb36IdmAClr1c0hfvdBx32wXRL2Flzs=
-ofam.dev/ochazuke v0.105.0 h1:8KHrAiiBqxNmGiqz0rJ4EJwTf6vma8ZGYIgjzapzXYU=
-ofam.dev/ochazuke v0.105.0/go.mod h1:89PFf8FkD+wkKb36IdmAClr1c0hfvdBx32wXRL2Flzs=
+ofam.dev/ochazuke v0.110.1 h1:bFvafk9Db/twWiNLqvEe0XKM6iEuZPhTxY3Eb6T+FJ0=
+ofam.dev/ochazuke v0.110.1/go.mod h1:89PFf8FkD+wkKb36IdmAClr1c0hfvdBx32wXRL2Flzs=
 ofam.dev/oden v0.3.0 h1:82Fy80eSM8bDBLE+ao4BpC6c+yd/9I0F4NY35XXOzCo=
 ofam.dev/oden v0.3.0/go.mod h1:rrwipKr19istfFQO+6xaj0gRKlXz2tOOiC50M1twDPc=
 tuios.dev/progstatus v0.1.0 h1:6d/rQpXJvZzDK9uxNKhchb6lKVep/8eng0jyNVCaVTI=
