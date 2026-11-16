@@ -28,6 +28,7 @@ Keep planning work in the family planning workspace, separate from this reposito
 | Tables: each noun's catalog columns and its rows' cells (`tables`, `cellsOf`), the context-size spellings | `table.go` |
 | MCP servers from each harness's files (normalized, redacted), the tools omp cached in agent.db (`sqlite3 -readonly`, `mcp_tools:` rows only) | `mcp.go` |
 | Package `harness` (importable; o-mcp uses it): harness roots, config parsing (`ReadConfig`), redaction, every harness's MCP servers with their raw entry (`DiscoverMCP`, `Configured`), Codex session files. `main` keeps thin wrappers over it | `harness/harness.go` |
+| Hidden default key rows as data (the run-3 key picker's), loaded after every verb and the Go row | `bindings.go`, `bindings.json` |
 | The quota noun: Claude and Codex logins, the usage endpoints, the Codex session-file fallback, quota rows | `quota.go` |
 | Tests: collectors and redaction (`main_test.go`), catalog, rows and `--target` (`shell_test.go`), every verb's history kind (`history_test.go`), the cache (`cache_test.go`), quota against httptest servers (`quota_test.go`) | `*_test.go` |
 
@@ -37,7 +38,7 @@ Keep planning work in the family planning workspace, separate from this reposito
 - Every list verb declares `.Rows(noun)`; `TestCatalogDeclaresRowsForEveryNoun` pins it.
 - Every verb declares its history kind (ochazuke v0.7.0): `.Fetch()` on a read, `setHistory` (shell.go) for a change (`model.select`); none is left to the default, and the catalog's `history` carries it. `TestEveryVerbDeclaresItsHistory` pins it.
 - A table noun's columns live once, in `tables` (table.go): the runtime noun declares them (the catalog's `columns`) and every row of the noun, list, jsonl or state, carries one cell per column (`TestRowsCarryCellsPerColumn`). A column change is a cells change in the same entry.
-- No TUI code and no key bindings here; a host renders. Never bind function keys.
+- No TUI code; the key rows are data (`bindings.json`, hidden defaults, plus quota's `F`); a host renders. Never bind function keys.
 - No verb-specific branches outside the runtime: a feature is a noun, its verbs and rows. The collectors know no command line.
 - Read-only: nothing edits a harness's settings or sends an inference request, and no configured MCP server is started: tools come only from a harness's own cache. `model select` writes only `~/.config/aiview/selection.json`. `quota` reads the vendors' usage endpoints (a GET with the harness's login) and never refreshes or writes a login.
 - `--no-probe` in every test that collects: tests never run the real harnesses. `TestMain` points `XDG_CACHE_HOME` at a temporary directory: tests never touch the user's cache.

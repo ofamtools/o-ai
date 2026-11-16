@@ -1,0 +1,140 @@
+// Hidden default key rows from the run-3 key picker; a user's bindings.json overrides them.
+{
+  "bindings": [
+    {"context": "agent/normal", "bindings": [
+      {"key": "d a", "action": "agent.archive", "hidden": true},
+      {"key": "n", "action": "agent.create", "hidden": true},
+      {"key": "d d", "action": "agent.delete", "hidden": true},
+      {"key": "r", "action": "agent.edit", "hidden": true},
+      {"key": "M", "action": "agent.get", "hidden": true},
+      {"key": "U", "action": "agent.history", "hidden": true},
+      {"key": "m", "action": "agent.list", "hidden": true},
+      {"key": "*", "action": "agent.set", "hidden": true},
+      {"key": "v", "action": "agent.show", "hidden": true},
+      {"key": "p", "action": "agent.yank", "hidden": true}
+    ]},
+    {"context": "harness/normal", "bindings": [
+      {"key": "d a", "action": "harness.archive", "hidden": true},
+      {"key": "n", "action": "harness.create", "hidden": true},
+      {"key": "d d", "action": "harness.delete", "hidden": true},
+      {"key": "r", "action": "harness.edit", "hidden": true},
+      {"key": "M", "action": "harness.get", "hidden": true},
+      {"key": "U", "action": "harness.history", "hidden": true},
+      {"key": "m", "action": "harness.list", "hidden": true},
+      {"key": "*", "action": "harness.set", "hidden": true},
+      {"key": "v", "action": "harness.show", "hidden": true},
+      {"key": "p", "action": "harness.yank", "hidden": true}
+    ]},
+    {"context": "inventory/normal", "bindings": [
+      {"key": "d a", "action": "inventory.archive", "hidden": true},
+      {"key": "n", "action": "inventory.create", "hidden": true},
+      {"key": "d d", "action": "inventory.delete", "hidden": true},
+      {"key": "r", "action": "inventory.edit", "hidden": true},
+      {"key": "M", "action": "inventory.get", "hidden": true},
+      {"key": "U", "action": "inventory.history", "hidden": true},
+      {"key": "m", "action": "inventory.list", "hidden": true},
+      {"key": "a", "action": "inventory.lists", "hidden": true},
+      {"key": "*", "action": "inventory.set", "hidden": true},
+      {"key": "v", "action": "inventory.show", "hidden": true},
+      {"key": "p", "action": "inventory.yank", "hidden": true}
+    ]},
+    {"context": "mcp-tool/normal", "bindings": [
+      {"key": "d a", "action": "mcp-tool.archive", "hidden": true},
+      {"key": "n", "action": "mcp-tool.create", "hidden": true},
+      {"key": "d d", "action": "mcp-tool.delete", "hidden": true},
+      {"key": "r", "action": "mcp-tool.edit", "hidden": true},
+      {"key": "M", "action": "mcp-tool.get", "hidden": true},
+      {"key": "U", "action": "mcp-tool.history", "hidden": true},
+      {"key": "m", "action": "mcp-tool.list", "hidden": true},
+      {"key": "*", "action": "mcp-tool.set", "hidden": true},
+      {"key": "v", "action": "mcp-tool.show", "hidden": true},
+      {"key": "p", "action": "mcp-tool.yank", "hidden": true}
+    ]},
+    {"context": "mcp/normal", "bindings": [
+      {"key": "d a", "action": "mcp.archive", "hidden": true},
+      {"key": "n", "action": "mcp.create", "hidden": true},
+      {"key": "d d", "action": "mcp.delete", "hidden": true},
+      {"key": "r", "action": "mcp.edit", "hidden": true},
+      {"key": "M", "action": "mcp.get", "hidden": true},
+      {"key": "U", "action": "mcp.history", "hidden": true},
+      {"key": "m", "action": "mcp.list", "hidden": true},
+      {"key": "*", "action": "mcp.set", "hidden": true},
+      {"key": "v", "action": "mcp.show", "hidden": true},
+      {"key": "b", "action": "mcp.tools", "hidden": true},
+      {"key": "p", "action": "mcp.yank", "hidden": true}
+    ]},
+    {"context": "model/normal", "bindings": [
+      {"key": "d a", "action": "model.archive", "hidden": true},
+      {"key": "n", "action": "model.create", "hidden": true},
+      {"key": "d d", "action": "model.delete", "hidden": true},
+      {"key": "r", "action": "model.edit", "hidden": true},
+      {"key": "M", "action": "model.get", "hidden": true},
+      {"key": "U", "action": "model.history", "hidden": true},
+      {"key": "m", "action": "model.list", "hidden": true},
+      {"key": "b", "action": "model.select", "hidden": true},
+      {"key": "*", "action": "model.set", "hidden": true},
+      {"key": "v", "action": "model.show", "hidden": true},
+      {"key": "p", "action": "model.yank", "hidden": true}
+    ]},
+    {"context": "provider/normal", "bindings": [
+      {"key": "d a", "action": "provider.archive", "hidden": true},
+      {"key": "n", "action": "provider.create", "hidden": true},
+      {"key": "d d", "action": "provider.delete", "hidden": true},
+      {"key": "r", "action": "provider.edit", "hidden": true},
+      {"key": "M", "action": "provider.get", "hidden": true},
+      {"key": "U", "action": "provider.history", "hidden": true},
+      {"key": "m", "action": "provider.list", "hidden": true},
+      {"key": "*", "action": "provider.set", "hidden": true},
+      {"key": "v", "action": "provider.show", "hidden": true},
+      {"key": "p", "action": "provider.yank", "hidden": true}
+    ]},
+    {"context": "quota/normal", "bindings": [
+      {"key": "d a", "action": "quota.archive", "hidden": true},
+      {"key": "n", "action": "quota.create", "hidden": true},
+      {"key": "d d", "action": "quota.delete", "hidden": true},
+      {"key": "r", "action": "quota.edit", "hidden": true},
+      {"key": "M", "action": "quota.get", "hidden": true},
+      {"key": "U", "action": "quota.history", "hidden": true},
+      {"key": "m", "action": "quota.list", "hidden": true},
+      {"key": "*", "action": "quota.set", "hidden": true},
+      {"key": "v", "action": "quota.show", "hidden": true},
+      {"key": "p", "action": "quota.yank", "hidden": true}
+    ]},
+    {"context": "setting/normal", "bindings": [
+      {"key": "d a", "action": "setting.archive", "hidden": true},
+      {"key": "n", "action": "setting.create", "hidden": true},
+      {"key": "d d", "action": "setting.delete", "hidden": true},
+      {"key": "r", "action": "setting.edit", "hidden": true},
+      {"key": "M", "action": "setting.get", "hidden": true},
+      {"key": "U", "action": "setting.history", "hidden": true},
+      {"key": "m", "action": "setting.list", "hidden": true},
+      {"key": "*", "action": "setting.set", "hidden": true},
+      {"key": "v", "action": "setting.show", "hidden": true},
+      {"key": "p", "action": "setting.yank", "hidden": true}
+    ]},
+    {"context": "skill/normal", "bindings": [
+      {"key": "d a", "action": "skill.archive", "hidden": true},
+      {"key": "n", "action": "skill.create", "hidden": true},
+      {"key": "d d", "action": "skill.delete", "hidden": true},
+      {"key": "r", "action": "skill.edit", "hidden": true},
+      {"key": "M", "action": "skill.get", "hidden": true},
+      {"key": "U", "action": "skill.history", "hidden": true},
+      {"key": "m", "action": "skill.list", "hidden": true},
+      {"key": "*", "action": "skill.set", "hidden": true},
+      {"key": "v", "action": "skill.show", "hidden": true},
+      {"key": "p", "action": "skill.yank", "hidden": true}
+    ]},
+    {"context": "thinking/normal", "bindings": [
+      {"key": "d a", "action": "thinking.archive", "hidden": true},
+      {"key": "n", "action": "thinking.create", "hidden": true},
+      {"key": "d d", "action": "thinking.delete", "hidden": true},
+      {"key": "r", "action": "thinking.edit", "hidden": true},
+      {"key": "M", "action": "thinking.get", "hidden": true},
+      {"key": "U", "action": "thinking.history", "hidden": true},
+      {"key": "m", "action": "thinking.list", "hidden": true},
+      {"key": "*", "action": "thinking.set", "hidden": true},
+      {"key": "v", "action": "thinking.show", "hidden": true},
+      {"key": "p", "action": "thinking.yank", "hidden": true}
+    ]}
+  ]
+}

@@ -298,6 +298,8 @@ func (t *Tool) shell() *ocli.Shell {
 		lists[noun].SetColumns(tb.columns...)
 	}
 
+	loadDefaultBindings(r)
+
 	sh := ocli.New(r, "o-ai", t.Stdin, t.Stdout, t.Stderr)
 	sh.Usage = ocli.DefaultUsage(t.Prog)
 	sh.Version = Version
