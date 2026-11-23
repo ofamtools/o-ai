@@ -40,7 +40,7 @@ func Collect(o Options) Inventory {
 func CollectNeed(o Options, need Need) Inventory {
 	in := Inventory{CapturedAt: time.Now().UTC(), Project: o.Project}
 	o.inputs.add(filepath.SplitList(os.Getenv("PATH"))...) // a harness installed or removed
-	ids := []string{"omp", "claude", "codex", "pi", "opencode", "gemini", "clawed"}
+	ids := harness.IDs
 	results := make([]Inventory, len(ids))
 	var wg sync.WaitGroup
 	for i, id := range ids {

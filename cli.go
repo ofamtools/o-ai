@@ -116,7 +116,7 @@ func aiManifest() *oden.ExtManifest {
 				SummaryField:   "id",
 				UniqueFields:   []string{"id"},
 				Fields: []oden.ExtField{
-					{Name: "id", Type: "string", Required: true, Description: "Harness identifier (claude, codex, omp, pi, opencode, gemini, clawed)"},
+					{Name: "id", Type: "string", Required: true, Description: "Harness identifier (claude, codex, omp, pi, opencode, gemini, clawed, agy)"},
 					{Name: "installed", Type: "bool", Description: "Whether executable was found on PATH"},
 					{Name: "configured", Type: "bool", Description: "Whether configuration files exist"},
 					{Name: "processStatus", Type: "string", Description: "Running process status"},
