@@ -21,8 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"ofam.dev/ochazuke"
-
 	"ofam.dev/o-ai/harness"
 )
 
@@ -90,77 +88,18 @@ type QuotaWindow struct {
 	key string // the row id's window part
 }
 
-func (t *Tool) defineQuota(r *ochazuke.Runtime, list *ochazuke.Collection) {
-	params := map[string]ochazuke.Parameter{
-		"harness": {Type: "string", Enum: quotaHarnesses, Description: "only this harness: claude or codex"},
-		"home":    collectParams["home"],
-		"timeout": {Type: "string", Description: "the usage request's deadline, a Go duration (default 15s)"},
-		"fresh":   {Type: "boolean", Description: "ask the vendor now even if the cached quota is young"},
-		"ttl":     {Type: "string", Description: "how old a cached quota may be, a Go duration (default 5m; 0s asks the vendor)"},
-		"backoff": {Type: "string", Description: "after a vendor refusal, how long before it is asked again, a Go duration (default 1m); --fresh and refresh ask anyway"},
-	}
-	r.Define("quota").
-		Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) },
-			"one row per rate-limit window: {id: quota/HARNESS:WINDOW, label, data: {usedPercent, remainingPercent, resetsAt, ...}}; a harness that cannot answer is one quota/HARNESS:error row").Rows("quota").Fetch().
-		Verb("refresh", func(c ochazuke.Ctx) ochazuke.Result {
-			args := ochazuke.Arguments{}
-			for k, v := range c.Args {
-				args[k] = v
-			}
-			args["fresh"] = true // the one verb that skips the quota cache
-			return t.quotaList(args, list)
-		}, "fetch the quota windows now, past the cache (rows as list; a harness the vendor refuses keeps its last good rows)").Rows("quota").Fetch().
-		Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return t.quotaShow(c) },
-			"a harness's quota record (claude or codex; none prints both): plan, source, observedAt, windows, error").Fetch()
-	r.DefineListFacts(ochazuke.ListFacts{Noun: "quota", List: func(c ochazuke.Ctx) ochazuke.Result { return t.quotaList(c.Args, list) }})
-	listOp := withParams(r.Operations.At("quota.list"), merged(params, formatParam))
-	listOp.Positional = []string{"harness"} // quota list claude
-	r.Operations.Set(listOp)
-	// F on a quota row fetches now, past the cache. Free in ochazuke's
-	// defaults and in mtm's list keys (a and D are retired there; every
-	// other letter but B, F, H, M, Z is taken).
-	if err := r.Bind(ochazuke.Binding{Mode: "normal", Noun: "quota", Keys: "F", Request: ochazuke.Request{Noun: "quota", Verb: "refresh"}, Hint: "fetch quota now"}); err != nil {
-		panic(err)
-	}
-	refresh := withParams(r.Operations.At("quota.refresh"), merged(params, formatParam))
-	refresh.Positional = []string{"harness"}
-	r.Operations.Set(refresh)
-	show := withParams(r.Operations.At("quota.show"), merged(params, map[string]ochazuke.Parameter{
-		"entry": {Type: "string", Enum: quotaHarnesses, Description: "claude or codex"},
-	}))
-	show.Positional = []string{"entry"}
-	r.Operations.Set(show)
-}
-
-func (t *Tool) quotaList(args ochazuke.Arguments, list *ochazuke.Collection) ochazuke.Result {
-	o, _, err := t.options(args)
-	if err != nil {
-		return ochazuke.Failed(err)
-	}
+// quotaListData fetches quota rows for o.Harness (or all quotaHarnesses).
+// It returns the rows, raw quotas, and an error if every requested harness failed.
+func (t *Tool) quotaListData(o Options) ([]Row, []Quota, error) {
 	harnesses := quotaHarnesses
 	if o.Harness != "" {
 		if !contains(quotaHarnesses, o.Harness) {
-			return ochazuke.Failed(fmt.Errorf("quota reads %s, not %q", strings.Join(quotaHarnesses, " and "), o.Harness))
+			return nil, nil, fmt.Errorf("quota reads %s, not %q", strings.Join(quotaHarnesses, " and "), o.Harness)
 		}
 		harnesses = []string{o.Harness}
 	}
 	quotas := t.quotas(o, harnesses)
 	rows := quotaRows(quotas, t.clock())
-	items := make([]ochazuke.ListItem, len(rows))
-	for i, row := range rows {
-		items[i] = ochazuke.ListItem{ID: row.ID, Label: row.Label, Noun: "quota", Data: strings.TrimPrefix(row.ID, "quota/"), Cells: row.Cells}
-	}
-	if err := list.SetItems(items); err != nil {
-		return ochazuke.Failed(err)
-	}
-	var value any = rows
-	switch format := ochazuke.StringArg(args, "format", "json"); format {
-	case "jsonl":
-		value = lines("quota", rows)
-	case "json":
-	default:
-		return ochazuke.Failed(fmt.Errorf("unknown --format %q: json or jsonl", format))
-	}
 	var failures []error
 	for _, q := range quotas {
 		if q.Error != "" {
@@ -168,18 +107,27 @@ func (t *Tool) quotaList(args ochazuke.Arguments, list *ochazuke.Collection) och
 		}
 	}
 	if len(failures) == len(quotas) {
-		// No harness answered: the error rows still print, and the
-		// command fails.
-		if err := writeJSON(t.Stdout, value); err != nil {
-			return ochazuke.Failed(err)
-		}
-		return ochazuke.Failed(fmt.Errorf("no quota answered: %w", errors.Join(failures...)))
+		return rows, quotas, fmt.Errorf("no quota answered: %w", errors.Join(failures...))
 	}
-	return ochazuke.Done(value)
+	return rows, quotas, nil
+}
+
+// quotaShowData returns one harness's Quota record, or all Quota records when harness is empty.
+func (t *Tool) quotaShowData(o Options, harnessName string) (any, error) {
+	if harnessName == "" {
+		harnessName = o.Harness
+	}
+	if harnessName == "" {
+		return t.quotas(o, quotaHarnesses), nil
+	}
+	if !contains(quotaHarnesses, harnessName) {
+		return nil, fmt.Errorf("quota show takes claude or codex, not %q", harnessName)
+	}
+	return t.quotas(o, []string{harnessName})[0], nil
 }
 
 func writeJSON(w io.Writer, v any) error {
-	if l, ok := v.(ochazuke.Lines); ok {
+	if l, ok := v.([]LineRow); ok {
 		for _, line := range l {
 			b, err := json.Marshal(line)
 			if err != nil {
@@ -197,31 +145,6 @@ func writeJSON(w io.Writer, v any) error {
 	}
 	_, err = fmt.Fprintf(w, "%s\n", b)
 	return err
-}
-
-// quotaShow prints a harness's record: --target's harness, else ENTRY,
-// else both.
-func (t *Tool) quotaShow(c ochazuke.Ctx) ochazuke.Result {
-	o, _, err := t.options(c.Args)
-	if err != nil {
-		return ochazuke.Failed(err)
-	}
-	harness := ochazuke.StringArg(c.Args, "entry", "")
-	if c.Instance != nil && c.Instance.Noun == "quota" {
-		if id, _ := c.Instance.Data.(string); id != "" {
-			harness, _, _ = strings.Cut(id, ":")
-		}
-	}
-	if harness == "" {
-		harness = o.Harness
-	}
-	if harness == "" {
-		return ochazuke.Done(t.quotas(o, quotaHarnesses))
-	}
-	if !contains(quotaHarnesses, harness) {
-		return ochazuke.Failed(fmt.Errorf("quota show takes claude or codex, not %q", harness))
-	}
-	return ochazuke.Done(t.quotas(o, []string{harness})[0])
 }
 
 // quotas reads each harness's quota concurrently, in harnesses' order.

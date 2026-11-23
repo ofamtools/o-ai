@@ -9,8 +9,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	ocli "ofam.dev/ochazuke/cli"
 )
 
 // The inventory cache: one collection serves every verb run within the TTL,
@@ -126,7 +124,7 @@ func (t *Tool) cachedInventory(o Options, key string, need Need) Inventory {
 		// The inputs are stat'd after the collection: a file changed while
 		// it ran shows after the TTL.
 		e := inputsEntry{At: now, Need: need, Inputs: o.inputs.list()}
-		e.Stat = ocli.StatFingerprint(e.Inputs...)
+		e.Stat = statFingerprint(e.Inputs...)
 		for _, h := range in.Harnesses {
 			e.Harnesses = append(e.Harnesses, harnessExec{h.ID, h.Executable})
 		}

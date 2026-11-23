@@ -11,9 +11,6 @@ import (
 	"sort"
 	"sync"
 	"time"
-
-	"ofam.dev/ochazuke"
-	ocli "ofam.dev/ochazuke/cli"
 )
 
 // A collection's inputs: every path the collectors read or looked for
@@ -117,10 +114,24 @@ func readInputs(path string) inputsFile {
 	return file
 }
 
+// statFingerprint hashes the stat metadata (path, existence, mode, size, mtime)
+// of each path in order.
+func statFingerprint(paths ...string) string {
+	h := sha256.New()
+	for _, p := range paths {
+		if info, err := os.Stat(p); err == nil {
+			fmt.Fprintf(h, "%s\x00%d\x00%d\x00%d\x00", p, info.Mode(), info.Size(), info.ModTime().UnixNano())
+		} else {
+			fmt.Fprintf(h, "%s\x00missing\x00", p)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:16])
+}
+
 // fresh reports whether e still describes the inventory collected at at:
 // the same collection and its inputs unchanged.
 func (e inputsEntry) fresh(at time.Time) bool {
-	return e.At.Equal(at) && e.Stat == ocli.StatFingerprint(e.Inputs...)
+	return e.At.Equal(at) && e.Stat == statFingerprint(e.Inputs...)
 }
 
 // stateNeed is the collection the state reads: every state noun's need.
@@ -145,11 +156,7 @@ var errNoFingerprint = errors.New("no recorded inputs for this collection")
 // refreshes every TTL). Processes are never cached: the harnesses' process
 // statuses are inspected here as the state would (one ps), so a harness
 // starting or exiting changes the fingerprint.
-func (t *Tool) stateFingerprint(args ochazuke.Arguments) (string, error) {
-	o, _, err := t.options(args)
-	if err != nil {
-		return "", err
-	}
+func (t *Tool) stateFingerprint(o Options) (string, error) {
 	need := stateNeed()
 	if o.NoProbe {
 		need.Catalogs, need.RuntimeAgents = false, false
@@ -169,7 +176,7 @@ func (t *Tool) stateFingerprint(args ochazuke.Arguments) (string, error) {
 	}
 	inspectProcesses(&in, o)
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s\x00", key, e.At.Format(time.RFC3339Nano), ocli.StatFingerprint(e.Inputs...), selfStat())
+	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s\x00", key, e.At.Format(time.RFC3339Nano), statFingerprint(e.Inputs...), selfStat())
 	for _, hr := range in.Harnesses {
 		fmt.Fprintf(h, "%s\x00%s\x00", hr.ID, hr.ProcessStatus)
 	}
@@ -186,5 +193,5 @@ func selfStat() string {
 	if err != nil {
 		return "unknown"
 	}
-	return ocli.StatFingerprint(exe)
+	return statFingerprint(exe)
 }

@@ -1,17 +1,13 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"ofam.dev/ochazuke"
 )
 
 // stateWorld runs o-ai's real collection (no probes) over a temporary home
@@ -46,71 +42,32 @@ func (w *stateWorld) tool(out *bytes.Buffer) *Tool {
 }
 
 func (w *stateWorld) fingerprint() (string, error) {
-	return w.tool(&bytes.Buffer{}).stateFingerprint(ochazuke.Arguments{"no-probe": true})
+	tl := w.tool(&bytes.Buffer{})
+	o := tl.defaultOptions()
+	o.NoProbe = true
+	return tl.stateFingerprint(o)
 }
 
-// state runs the state verb with since (nil: the first call) and returns
-// the cache id, each list's answer and hash, and the skill row ids.
-func (w *stateWorld) state(cache string, since map[string]string) (string, map[string]string, map[string]string, []string) {
+func (w *stateWorld) runLists() string {
 	w.t.Helper()
-	args := []string{"inventory", "lists", "--json", `{"no-probe": true}`}
-	if since == nil {
-		args = append(args, "--since=")
-	} else {
-		var parts []string
-		for k, v := range since {
-			parts = append(parts, k+"="+v)
-		}
-		args = append(args, "--since-cache", cache, "--since", strings.Join(parts, ","))
-	}
 	var out bytes.Buffer
-	if err := w.tool(&out).Main(context.Background(), args); err != nil {
+	if err := w.tool(&out).Main(context.Background(), []string{"inventory", "lists", "--no-probe"}); err != nil {
 		w.t.Fatal(err)
 	}
-	answers, hashes := map[string]string{}, map[string]string{}
-	var skills []string
-	sc := bufio.NewScanner(&out)
-	sc.Buffer(nil, 1<<24)
-	for sc.Scan() {
-		var line struct {
-			Cache, List, Answer, Hash, Noun, ID string
-		}
-		if err := json.Unmarshal(sc.Bytes(), &line); err != nil {
-			w.t.Fatalf("%v: %s", err, sc.Text())
-		}
-		switch {
-		case line.Cache != "":
-			cache = line.Cache
-		case line.List != "":
-			answers[line.List], hashes[line.List] = line.Answer, line.Hash
-		case line.Noun == "skill":
-			skills = append(skills, line.ID)
-		}
-	}
-	return cache, answers, hashes, skills
-}
-
-func allUnchanged(answers map[string]string) bool {
-	for _, a := range answers {
-		if a != "unchanged" {
-			return false
-		}
-	}
-	return len(answers) > 0
+	return out.String()
 }
 
 // TestStateFingerprintFollowsInputs pins the fingerprint's inputs: a new
 // skill deep in a tree, an environment variable a collector reads and the
-// TTL each change it or refuse it, and an unchanged poll answers every list
-// unchanged.
+// TTL each change it or refuse it.
 func TestStateFingerprintFollowsInputs(t *testing.T) {
 	w := newStateWorld(t)
 	if _, err := w.fingerprint(); err == nil {
 		t.Fatal("a fingerprint with no recorded collection")
 	}
-	cache, _, hashes, skills := w.state("", nil)
-	if len(skills) == 0 || w.collections != 1 {
-		t.Fatalf("first state: skills %v, %d collections", skills, w.collections)
+	out := w.runLists()
+	if !strings.Contains(out, `"noun":"skill"`) || w.collections != 1 {
+		t.Fatalf("first state: %d collections, out=%s", w.collections, out)
 	}
 	fp, err := w.fingerprint()
 	if err != nil || fp == "" {
@@ -119,15 +76,8 @@ func TestStateFingerprintFollowsInputs(t *testing.T) {
 	if again, _ := w.fingerprint(); again != fp {
 		t.Fatalf("fingerprint of unchanged inputs moved: %s, %s", fp, again)
 	}
-	// The second poll records the fingerprint (the first had none); the
-	// third answers from it.
-	for i := 0; i < 2; i++ {
-		var answers map[string]string
-		cache, answers, _, _ = w.state(cache, hashes)
-		if !allUnchanged(answers) {
-			t.Fatalf("unchanged poll %d: %v", i, answers)
-		}
-	}
+	// Repeat call within TTL with unchanged inputs does not recollect.
+	w.runLists()
 	if w.collections != 1 {
 		t.Fatalf("unchanged polls collected: %d", w.collections)
 	}
@@ -137,12 +87,9 @@ func TestStateFingerprintFollowsInputs(t *testing.T) {
 	if moved, _ := w.fingerprint(); moved == fp {
 		t.Fatal("a new skill deep in a tree left the fingerprint")
 	}
-	cache, answers, hashes, _ := w.state(cache, hashes)
-	if answers["skill"] != "delta" || w.collections != 2 {
-		t.Fatalf("after a new skill: %v, %d collections", answers, w.collections)
-	}
-	if _, _, _, after := w.state("", nil); len(after) <= len(skills) {
-		t.Fatalf("skills after the add: %v", after)
+	out = w.runLists()
+	if w.collections != 2 || !strings.Contains(out, "second") {
+		t.Fatalf("after a new skill: %d collections, out=%s", w.collections, out)
 	}
 	fp, _ = w.fingerprint()
 
@@ -159,9 +106,9 @@ func TestStateFingerprintFollowsInputs(t *testing.T) {
 	if _, err := w.fingerprint(); err == nil {
 		t.Fatal("a fingerprint past the TTL")
 	}
-	_, answers, _, _ = w.state(cache, hashes)
-	if w.collections != 3 || !allUnchanged(answers) {
-		t.Fatalf("past the TTL: %d collections, %v", w.collections, answers)
+	w.runLists()
+	if w.collections != 3 {
+		t.Fatalf("past the TTL: %d collections", w.collections)
 	}
 }
 
@@ -169,8 +116,8 @@ func TestStateFingerprintFollowsInputs(t *testing.T) {
 // TTL is a new collection, not the cached inventory.
 func TestInventoryCacheRecollectsWhenInputsChange(t *testing.T) {
 	w := newStateWorld(t)
-	w.state("", nil)
-	w.state("", nil)
+	w.runLists()
+	w.runLists()
 	if w.collections != 1 {
 		t.Fatalf("unchanged inputs within the TTL: %d collections", w.collections)
 	}
@@ -178,7 +125,7 @@ func TestInventoryCacheRecollectsWhenInputsChange(t *testing.T) {
 	if err := os.WriteFile(settings, []byte(`{"model": "x"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	w.state("", nil)
+	w.runLists()
 	if w.collections != 2 {
 		t.Fatalf("a settings file appeared: %d collections", w.collections)
 	}

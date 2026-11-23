@@ -2,33 +2,22 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
-
-	"ofam.dev/ochazuke"
-	ocli "ofam.dev/ochazuke/cli"
 )
 
-// The command line is an ochazuke runtime behind ochazuke/cli: one noun per
-// inventory kind (categories) plus status, each with list (rows, declared
-// with Rows so a host such as nabe lists them) and show; model also has
-// select. A row is {id: "NOUN/ENTRY_ID", label, data: the inventory record},
-// the record in the JSON shape aiview always printed, and show prints that
-// record alone. A --target no list shows yet is revealed as a bare row of
-// its noun; show then finds the id in its own collection.
+// Version is the application and catalog version.
+const Version = "0.2.0"
 
-// nouns are the runtime's nouns: the inventory kinds, status, then quota.
+// Namespace is the singular namespace o-ai declares.
+const Namespace = "ai"
+
+// nouns are o-ai's domain nouns: the inventory categories, inventory, and quota.
 var nouns = append(append([]string{}, categories...), "inventory", "quota")
 
-// nounSpec is what a noun's verbs read: the bulky fields a list row's data
-// leaves out (multi-KB at the long tail; show still prints the whole
-// record), the fields a state row's data keeps (what a host draws a row's
-// details from without a show), and the costly parts of a collection they
-// need.
+// nounSpec describes what a noun's list/state projections omit or keep and
+// what costly collection parts they need.
 type nounSpec struct {
 	omit  []string
 	brief []string // a state row's data: these keys of the record; none keeps the lean record
@@ -39,7 +28,7 @@ type nounSpec struct {
 var catalogs = Need{Catalogs: true}
 
 // specs are the nouns' needs. Resource and settings lists read files only;
-// harness and status read everything, processes included.
+// harness and inventory read everything, processes included.
 var specs = map[string]nounSpec{
 	"harness":   {omit: []string{"settings"}, brief: []string{"id", "installed", "configured", "executable", "processStatus", "catalogStatus"}, need: needAll},
 	"provider":  {omit: []string{"models"}, brief: []string{"harness", "slug", "access"}, need: catalogs},
@@ -57,7 +46,7 @@ var specs = map[string]nounSpec{
 var resourceBrief = []string{"name", "description", "path", "harnesses", "scope", "source"}
 
 // briefText is how many characters of a state row's description stay; a
-// longer one is cut and ends in "…" (show prints it whole).
+// longer one is cut and ends in "…".
 const briefText = 160
 
 // brief is a record as a state row carries it: the noun's brief keys
@@ -115,229 +104,30 @@ func lean(noun string, v any) (any, error) {
 	return m, nil
 }
 
-// Version is the catalog's version.
-const Version = "0.1.0"
-
 // Row is one element of a list.
 type Row struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-	Data  any    `json:"data,omitempty"`
-	// Cells are the row's table cells, one per column its noun declares
-	// (table.go); none for a noun without columns.
+	ID    string   `json:"id"`
+	Label string   `json:"label"`
+	Data  any      `json:"data,omitempty"`
 	Cells []string `json:"cells,omitempty"`
 }
 
-// KindCount is a status row's data: how many records of a kind.
+// LineRow is one JSON Lines element tagged with its noun.
+type LineRow struct {
+	Noun  string   `json:"noun"`
+	ID    string   `json:"id"`
+	Label string   `json:"label"`
+	Data  any      `json:"data,omitempty"`
+	Cells []string `json:"cells,omitempty"`
+}
+
+// KindCount is an inventory summary row's data: how many records of a kind.
 type KindCount struct {
 	Kind  string `json:"kind"`
 	Count int    `json:"count"`
 }
 
-var collectParams = map[string]ochazuke.Parameter{
-	"project":  {Type: "string", Description: "inspect this project's settings and resources (default: the working directory)"},
-	"home":     {Type: "string", Description: "alternate home for file discovery and child processes"},
-	"timeout":  {Type: "string", Description: "per metadata command deadline, a Go duration (default 15s)"},
-	"no-probe": {Type: "boolean", Description: "files only; do not run harness metadata commands"},
-	"fresh":    {Type: "boolean", Description: "collect now even if the inventory cache is young"},
-	"ttl":      {Type: "string", Description: "how old a cached inventory may be, a Go duration (default 5m; 0s collects)"},
-}
-
-var formatParam = map[string]ochazuke.Parameter{
-	"format": {Type: "string", Enum: []string{"json", "jsonl"}, Description: "json (an array, the default) or jsonl (one {noun, id, label, data} per line, the state's shape)"},
-}
-
-// nounParams are the parameters only some nouns' list and show take.
-var nounParams = map[string]map[string]ochazuke.Parameter{
-	"mcp":      {"server": {Type: "string", Description: "exact MCP server name"}},
-	"mcp-tool": {"server": {Type: "string", Description: "exact MCP server name (its tools)"}},
-}
-
-var filterParams = map[string]ochazuke.Parameter{
-	"harness":  {Type: "string", Description: "exact harness id, e.g. omp, claude, codex"},
-	"provider": {Type: "string", Description: "exact provider slug"},
-	"model":    {Type: "string", Description: "filter models and thinking levels by model id, slug or display name"},
-	"search":   {Type: "string", Description: "case-insensitive id, name and description search"},
-}
-
-// entryParam sorts before every other parameter, so a bare word after
-// show or select fills it (ochazuke.Operation.ParameterOrder is by name).
-var entryParam = map[string]ochazuke.Parameter{
-	"entry": {Type: "string", Description: "an id, name, slug or path from the noun's list"},
-}
-
-func merged(ms ...map[string]ochazuke.Parameter) map[string]ochazuke.Parameter {
-	out := map[string]ochazuke.Parameter{}
-	for _, m := range ms {
-		for k, v := range m {
-			out[k] = v
-		}
-	}
-	return out
-}
-
-func (t *Tool) shell() *ocli.Shell {
-	r := ochazuke.NewRuntime()
-	// Every inventory kind is o-ai's own noun (DefineOwn) and owns its short
-	// name over a framework noun's alias: `o-ai settings list` lists harness
-	// settings files (the framework's own noun is ochazuke.setting), and
-	// ochazuke.agent (agent instructions and
-	// rights, ochazuke v0.76.0) keeps its verbs while `o-ai agent list`
-	// lists agents. A later r.Define(noun) then reaches o-ai's noun.
-	for _, noun := range nouns {
-		r.DefineOwn(noun)
-	}
-	lists := map[string]*ochazuke.Collection{}
-	for _, noun := range nouns {
-		list, err := r.AddList("list/"+noun, nil)
-		if err != nil {
-			panic(err) // a fresh runtime takes every list
-		}
-		lists[noun] = list
-	}
-	result := func(v any, err error) ochazuke.Result {
-		if err != nil {
-			return ochazuke.Failed(err)
-		}
-		return ochazuke.Done(v)
-	}
-	load := func(noun string, args ochazuke.Arguments) ([]Row, error) {
-		o, model, err := t.options(args)
-		if err != nil {
-			return nil, err
-		}
-		rows, err := nounRows(noun, t.inventory(o, specs[noun].need), o, model, lean)
-		if err != nil {
-			return nil, err
-		}
-		items := make([]ochazuke.ListItem, len(rows))
-		for i, row := range rows {
-			items[i] = ochazuke.ListItem{ID: row.ID, Label: row.Label, Noun: noun, Data: strings.TrimPrefix(row.ID, noun+"/"), Cells: row.Cells}
-		}
-		return rows, lists[noun].SetItems(items)
-	}
-	// listed is a list verb's answer: a JSON array, or JSON Lines tagged
-	// with the noun under --format jsonl (the state's line shape).
-	listed := func(noun string, args ochazuke.Arguments) ochazuke.Result {
-		rows, err := load(noun, args)
-		switch format := ochazuke.StringArg(args, "format", "json"); {
-		case err != nil:
-			return ochazuke.Failed(err)
-		case format == "jsonl":
-			return ochazuke.Done(lines(noun, rows))
-		case format != "json":
-			return ochazuke.Failed(fmt.Errorf("unknown --format %q: json or jsonl", format))
-		}
-		return ochazuke.Done(rows)
-	}
-	for _, noun := range categories {
-		b := r.Define(noun).
-			Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) },
-				"the "+noun+" rows: {id, label, data}, data the inventory record (--format jsonl: one tagged row per line)").Rows(noun).Fetch().
-			Verb("show", func(c ochazuke.Ctx) ochazuke.Result { return result(t.show(noun, c, false)) },
-				"one "+noun+" record: ENTRY (an id, name, slug or path) or --target ROW_ID").Fetch()
-		params := merged(collectParams, filterParams, nounParams[noun])
-		r.Operations.Set(withParams(r.Operations.At(ochazuke.Key(noun+".list")), merged(params, formatParam)))
-		r.Operations.Set(withParams(r.Operations.At(ochazuke.Key(noun+".show")), merged(params, entryParam)))
-		if _, ok := nounParams[noun]["server"]; ok { // mcp tools tuios: a bare word after list is the server
-			op := r.Operations.At(ochazuke.Key(noun + ".list"))
-			op.Positional = []string{"server"}
-			r.Operations.Set(op)
-		}
-		if noun == "model" {
-			b.Verb("select", func(c ochazuke.Ctx) ochazuke.Result { return result(t.show(noun, c, true)) },
-				"save ENTRY as o-ai's model selection (~/.config/aiview/selection.json); model show with no ENTRY prints it")
-			r.Operations.Set(withParams(r.Operations.At("model.select"), merged(params, entryParam)))
-			// select writes the selection file: the one change o-ai makes.
-			setHistory(r, ochazuke.HistoryChange, "model.select")
-		}
-	}
-	// mcp tools [SERVER] is mcp-tool list: the tools of the server a
-	// bare word, --server or a --target mcp row names (all with none).
-	r.Define("mcp").
-		Verb("tools", func(c ochazuke.Ctx) ochazuke.Result {
-			args := ochazuke.Arguments{}
-			for k, v := range c.Args {
-				args[k] = v
-			}
-			if c.Instance != nil && c.Instance.Noun == "mcp" && ochazuke.StringArg(args, "server", "") == "" {
-				if id, ok := c.Instance.Data.(string); ok {
-					args["server"] = id[strings.LastIndex(id, ":")+1:] // HARNESS:SCOPE:NAME
-				}
-			}
-			return listed("mcp-tool", args)
-		}, "the tools a server exposes, as a harness cached them (omp): mcp-tool rows of SERVER, --server or the --target mcp row's server").Rows("mcp-tool").Fetch()
-	tools := r.Operations.At("mcp.tools")
-	tools.Parameters, tools.Positional = r.Operations.At("mcp-tool.list").Parameters, r.Operations.At("mcp-tool.list").Positional
-	r.Operations.Set(tools)
-	r.Define("inventory").Main(). // the tool's main noun: `o-ai list` is `inventory list`, the default view
-					Verb("list", func(c ochazuke.Ctx) ochazuke.Result { return listed("inventory", c.Args) },
-			"how many records of each kind: {id, label, data: {kind, count}}").Rows("inventory").Fetch().
-		Verb("show", func(c ochazuke.Ctx) ochazuke.Result {
-			o, _, err := t.options(c.Args)
-			if err != nil {
-				return ochazuke.Failed(err)
-			}
-			return ochazuke.Done(t.inventory(o, specs["inventory"].need))
-		}, "the whole inventory, warnings included").Fetch()
-	r.Define("inventory").
-		Verb("lists", func(c ochazuke.Ctx) ochazuke.Result { return result(t.state(c.Args)) },
-			"every list's rows in one collection, JSON Lines {noun, id, label, data: the brief record} for "+strings.Join(stateNouns(), ", ")+" (the catalog's state source)").Lists().Fetch()
-	r.Operations.Set(withParams(r.Operations.At("inventory.lists"), merged(collectParams, filterParams)))
-	r.Operations.Set(withParams(r.Operations.At("inventory.list"), merged(collectParams, formatParam)))
-	r.Operations.Set(withParams(r.Operations.At("inventory.show"), collectParams))
-	t.defineQuota(r, lists["quota"])
-	defineListStores(r, listed)
-	for noun, spec := range specs { // the nouns the state leaves out are declared live
-		if spec.live {
-			r.Define(noun).Live()
-		}
-	}
-	for noun, tb := range tables { // the catalog's columns, and the lists drawn as tables
-		r.Define(noun).Columns(tb.columns...)
-		lists[noun].SetColumns(tb.columns...)
-	}
-
-	loadDefaultBindings(r)
-
-	sh := ocli.New(r, "o-ai", t.Stdin, t.Stdout, t.Stderr)
-	sh.Usage = ocli.DefaultUsage(t.Prog)
-	sh.Version = Version
-	// The state's cache (ochazuke's StateCache) lives beside the inventory
-	// cache, scoped by what a collection depends on (cacheKey: home,
-	// project, environment, skill sources), and its fingerprint is the
-	// recorded inputs plus the processes (inputs.go).
-	sh.StateCache.Dir = filepath.Join(filepath.Dir(t.cachePath()), "state")
-	sh.StateCache.Scope = func(args ochazuke.Arguments) string {
-		o, _, err := t.options(args)
-		if err != nil {
-			return ""
-		}
-		return cacheKey(o)
-	}
-	sh.StateCache.Fingerprint = t.stateFingerprint
-	// Reveal makes the target row exist without collecting: show
-	// collects with its own arguments and looks the id up there.
-	sh.Reveal = func(target string) error {
-		noun, id, ok := strings.Cut(target, "/")
-		if !ok || id == "" || lists[noun] == nil {
-			return fmt.Errorf("not a row id (NOUN/ID from a list): %s", target)
-		}
-		return lists[noun].SetItems([]ochazuke.ListItem{{ID: target, Label: id, Noun: noun, Data: id}})
-	}
-	return sh
-}
-
-// defineListStores makes each inventory noun a thing noun over its list
-// verb (Runtime.DefineListFacts): get reads one row, and the other core verbs are on
-// the noun, unavailable. (quota's is declared with its verbs.)
-func defineListStores(r *ochazuke.Runtime, listed func(string, ochazuke.Arguments) ochazuke.Result) {
-	for _, noun := range append(append([]string{}, categories...), "inventory") {
-		r.DefineListFacts(ochazuke.ListFacts{Noun: noun, List: func(c ochazuke.Ctx) ochazuke.Result { return listed(noun, c.Args) }})
-	}
-}
-
-// nounRows is one noun's rows from an inventory: the status counts, else
+// nounRows is one noun's rows from an inventory: the counts, else
 // the noun's entries after the model filter, each record as shape gives it
 // (lean for a list, brief for the state).
 func nounRows(noun string, in Inventory, o Options, model string, shape func(string, any) (any, error)) ([]Row, error) {
@@ -362,18 +152,10 @@ func nounRows(noun string, in Inventory, o Options, model string, shape func(str
 	return rows, err
 }
 
-// state is the catalog's state source: one collection covering every
-// noun's need, processes inspected once, and every list's rows as JSON
-// Lines tagged by noun (ochazuke/cli Row). A row's data is its brief
-// record (specs' brief keys): enough for a host to draw a row's details
-// without a show, which prints the whole record.
-func (t *Tool) state(args ochazuke.Arguments) (ocli.Lines, error) {
-	o, model, err := t.options(args)
-	if err != nil {
-		return nil, err
-	}
+// state returns every non-live noun's rows in one collection, as JSON Lines.
+func (t *Tool) state(o Options, model string) ([]LineRow, error) {
 	in := t.inventory(o, stateNeed())
-	var out ocli.Lines
+	var out []LineRow
 	for _, noun := range stateNouns() {
 		rows, err := nounRows(noun, in, o, model, brief)
 		if err != nil {
@@ -384,7 +166,7 @@ func (t *Tool) state(args ochazuke.Arguments) (ocli.Lines, error) {
 	return out, nil
 }
 
-// stateNouns are the nouns the state answers: every noun but the live ones.
+// stateNouns are the nouns the state answers: every noun except live ones.
 func stateNouns() []string {
 	var out []string
 	for _, noun := range nouns {
@@ -395,18 +177,13 @@ func stateNouns() []string {
 	return out
 }
 
-// lines is rows as JSON Lines tagged with their noun.
-func lines(noun string, rows []Row) ocli.Lines {
-	out := make(ocli.Lines, len(rows))
+// lines converts rows to JSON Lines tagged with their noun.
+func lines(noun string, rows []Row) []LineRow {
+	out := make([]LineRow, len(rows))
 	for i, r := range rows {
-		out[i] = ocli.Row{Noun: noun, ID: r.ID, Label: r.Label, Data: r.Data, Cells: r.Cells}
+		out[i] = LineRow{Noun: noun, ID: r.ID, Label: r.Label, Data: r.Data, Cells: r.Cells}
 	}
 	return out
-}
-
-func withParams(op ochazuke.Operation, p map[string]ochazuke.Parameter) ochazuke.Operation {
-	op.Parameters = p
-	return op
 }
 
 // label is a row's label: the name, a thinking level's model and slug, and
@@ -433,103 +210,6 @@ func kindCounts(in Inventory) []KindCount {
 		{"skills", len(in.Skills)}, {"agents", len(in.Agents)}, {"mcps", len(in.MCPServers)}, {"mcp-tools", len(in.MCPTools)},
 		{"warnings", len(in.Warnings)},
 	}
-}
-
-// show is the record a show or select names: the target row, else the
-// entry argument; model show with neither is the saved selection.
-func (t *Tool) show(noun string, c ochazuke.Ctx, sel bool) (any, error) {
-	o, model, err := t.options(c.Args)
-	if err != nil {
-		return nil, err
-	}
-	rows := filterModel(t.inventory(o, specs[noun].need).Entries(noun, o), model)
-	var row Entry
-	var id string
-	if c.Instance != nil && c.Instance.Noun == noun {
-		id, _ = c.Instance.Data.(string)
-	}
-	if id != "" {
-		found := false
-		for _, e := range rows {
-			if e.ID == id {
-				row, found = e, true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("no %s %q with these filters", noun, id)
-		}
-	} else {
-		query := ochazuke.StringArg(c.Args, "entry", "")
-		if query == "" && noun == "model" && !sel {
-			if query, err = loadSelection(o); err != nil {
-				return nil, err
-			}
-		}
-		if query == "" {
-			return nil, fmt.Errorf("%s %s needs ENTRY or --target ROW_ID", noun, map[bool]string{true: "select", false: "show"}[sel])
-		}
-		if row, err = selectEntry(rows, query); err != nil {
-			return nil, err
-		}
-	}
-	if sel {
-		if err := saveSelection(o, row.ID); err != nil {
-			return nil, err
-		}
-	}
-	return row.Value, nil
-}
-
-// options are the collection options and the model filter a verb's
-// arguments spell, defaulting home and project to the tool's.
-func (t *Tool) options(args ochazuke.Arguments) (Options, string, error) {
-	o := Options{
-		Home:     ochazuke.StringArg(args, "home", t.Home),
-		Project:  ochazuke.StringArg(args, "project", t.Cwd),
-		Timeout:  15 * time.Second,
-		Harness:  ochazuke.StringArg(args, "harness", ""),
-		Provider: ochazuke.StringArg(args, "provider", ""),
-		Search:   ochazuke.StringArg(args, "search", ""),
-		Server:   ochazuke.StringArg(args, "server", ""),
-	}
-	o.NoProbe, _ = args["no-probe"].(bool)
-	o.Fresh, _ = args["fresh"].(bool)
-	if v := ochazuke.StringArg(args, "timeout", ""); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil || d <= 0 {
-			return o, "", fmt.Errorf("invalid positive duration %q", v)
-		}
-		o.Timeout = d
-	}
-	o.TTL = defaultTTL
-	if v := ochazuke.StringArg(args, "ttl", ""); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil || d < 0 {
-			return o, "", fmt.Errorf("invalid --ttl %q (a duration, 0s or more)", v)
-		}
-		o.TTL = d
-	}
-	o.Backoff = time.Minute
-	if v := ochazuke.StringArg(args, "backoff", ""); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil || d < 0 {
-			return o, "", fmt.Errorf("invalid --backoff %q (a duration, 0s or more)", v)
-		}
-		o.Backoff = d
-	}
-	var err error
-	if o.Home, err = filepath.Abs(expandPath(o.Home, t.Home, t.Cwd)); err != nil {
-		return o, "", err
-	}
-	if o.Project, err = filepath.Abs(expandPath(o.Project, o.Home, t.Cwd)); err != nil {
-		return o, "", err
-	}
-	for _, path := range []string{o.Home, o.Project} {
-		if !isDir(path) {
-			return o, "", errors.New("not a readable directory: " + path)
-		}
-	}
-	return o, ochazuke.StringArg(args, "model", ""), nil
 }
 
 // inventory is the collection need asks for: this process's, else the
@@ -564,19 +244,4 @@ func (t *Tool) inventory(o Options, need Need) Inventory {
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-// setHistory declares the history kind (Operation.HistoryKind) of each
-// named verb, so none is left to the default: NounBuilder.Fetch marks a
-// read where it is declared, and the builder has no method for a change.
-// An unknown key panics, so a renamed verb is renamed here too.
-func setHistory(r *ochazuke.Runtime, kind string, keys ...string) {
-	for _, key := range keys {
-		op, ok := r.Operations.Find(ochazuke.Key(key))
-		if !ok {
-			panic("setHistory: no operation " + key)
-		}
-		op.HistoryKind = kind
-		r.Operations.Set(op)
-	}
 }

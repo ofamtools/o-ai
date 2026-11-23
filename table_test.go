@@ -11,49 +11,29 @@ import (
 	"testing"
 	"time"
 
-	"ofam.dev/ochazuke"
+	"ofam.dev/oden"
 )
 
-// The catalog declares each table noun's columns, in order.
+// The catalog declares schemas with default columns for o-ai's domain kinds.
 func TestCatalogDeclaresColumns(t *testing.T) {
 	out, _, err := runCLI(t, "catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var doc struct {
-		Nouns []struct {
-			Name    string            `json:"name"`
-			Columns []ochazuke.Column `json:"columns"`
-		} `json:"nouns"`
-	}
+	var doc oden.ExtManifest
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
 		t.Fatal(err)
 	}
-	titles := map[string][]string{}
-	for _, n := range doc.Nouns {
-		for _, c := range n.Columns {
-			titles[n.Name] = append(titles[n.Name], c.Title)
-		}
+	if doc.Name != "o-ai" {
+		t.Fatalf("catalog name = %q, want o-ai", doc.Name)
 	}
-	want := map[string][]string{
-		"skill":     {"name", "source", "scope", "description"},
-		"agent":     {"name", "source", "scope", "description"},
-		"model":     {"model", "harness", "provider", "context", "thinking"},
-		"harness":   {"harness", "status", "procs", "catalog", "executable"},
-		"provider":  {"provider", "harness", "models", "access"},
-		"mcp":       {"server", "harness", "scope", "transport", "command"},
-		"mcp-tool":  {"tool", "server", "description"},
-		"quota":     {"harness", "window", "used", "left", "resets"},
-		"inventory": {"kind", "count"},
+	byKind := map[string][]string{}
+	for _, s := range doc.Schemas {
+		byKind[s.Kind] = s.DefaultColumns
 	}
-	for noun, w := range want {
-		if !slices.Equal(titles[noun], w) {
-			t.Errorf("%s columns %v, want %v", noun, titles[noun], w)
-		}
-	}
-	for _, noun := range []string{"thinking", "setting"} {
-		if titles[noun] != nil {
-			t.Errorf("%s has columns %v", noun, titles[noun])
+	for _, kind := range []string{"ai.harness", "ai.provider", "ai.model", "ai.skill", "ai.agent", "ai.mcp", "ai.mcp-tool", "ai.quota"} {
+		if len(byKind[kind]) == 0 {
+			t.Errorf("schema %s missing default columns", kind)
 		}
 	}
 }

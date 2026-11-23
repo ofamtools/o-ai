@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ofam.dev/oden"
 )
 
 func TestContextualHelpDoesNotCollect(t *testing.T) {
@@ -24,56 +26,52 @@ func TestContextualHelpDoesNotCollect(t *testing.T) {
 			if err := tool.Main(t.Context(), args); err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{"o-ai", "list", "CLI execution:"} {
-				if !strings.Contains(out.String(), want) {
-					t.Errorf("help missing %q:\n%s", want, out.String())
+			combined := out.String() + errOut.String()
+			for _, want := range []string{"o-ai", "list"} {
+				if !strings.Contains(combined, want) {
+					t.Errorf("help missing %q:\n%s", want, combined)
 				}
-			}
-			if errOut.Len() != 0 {
-				t.Errorf("help wrote stderr: %s", errOut.String())
 			}
 		})
 	}
 }
 
-func TestCatalogDeclaresRowsForEveryNoun(t *testing.T) {
+func TestV2CLIProtocolAndSmoke(t *testing.T) {
 	out, _, err := runCLI(t, "catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var doc struct {
-		Schema int    `json:"schema"`
-		Name   string `json:"name"`
-		Nouns  []struct {
-			Name  string `json:"name"`
-			Verbs []struct {
-				Name string `json:"name"`
-				Kind string `json:"kind"`
-				Rows string `json:"rows"`
-			} `json:"verbs"`
-		} `json:"nouns"`
-	}
+	var doc oden.ExtManifest
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"state": "inventory.lists"`) {
-		t.Errorf("catalog names no state source:\n%.300s", out)
+	if doc.Name != "o-ai" || len(doc.Schemas) < 8 {
+		t.Fatalf("unexpected manifest: %+v", doc)
 	}
-	if doc.Schema != 1 || doc.Name != "o-ai" {
-		t.Fatalf("schema %d name %q", doc.Schema, doc.Name)
+
+	out, _, err = runCLI(t, "capabilities", "--json")
+	if err != nil || !strings.Contains(out, `"o-ai"`) {
+		t.Fatalf("capabilities: %v\n%s", err, out)
 	}
-	rows := map[string]string{}
-	for _, n := range doc.Nouns {
-		for _, v := range n.Verbs {
-			if v.Name == "list" {
-				rows[n.Name] = v.Rows
-			}
-		}
+
+	out, _, err = runCLI(t, "binding", "check")
+	if err != nil || !strings.Contains(out, "0 errors") {
+		t.Fatalf("binding check: %v\n%s", err, out)
 	}
-	for _, noun := range nouns {
-		if rows[noun] != noun {
-			t.Errorf("%s list declares rows %q", noun, rows[noun])
-		}
+
+	out, _, err = runCLI(t, "inspect", "actions")
+	if err != nil || !strings.Contains(out, "inventory.refresh") {
+		t.Fatalf("inspect actions: %v\n%s", err, out)
+	}
+
+	out, _, err = runCLI(t, "--version")
+	if err != nil || !strings.Contains(out, Version) {
+		t.Fatalf("version: %v\n%s", err, out)
+	}
+
+	out, _, err = runCLI(t, "--smoke")
+	if err != nil || !strings.Contains(out, "smoke ok") {
+		t.Fatalf("smoke: %v\n%s", err, out)
 	}
 }
 

@@ -1,25 +1,17 @@
-// Command o-ai is the AI hub's data tool: the local AI harnesses (omp,
+// Command o-ai is the AI hub's data tool and TUI: the local AI harnesses (omp,
 // claude, codex, pi, opencode, gemini, clawed) and their providers, models,
-// thinking levels, skills, agents and settings, inspected without making a
-// model request, and the plan quota Claude Code and Codex have used and
-// have left (quota, a read-only request to each vendor's usage endpoint). It was aiview; it is now a family tool (o-<tool>), so
-// o ai ARGS runs it, and so does mtm ai ARGS (mtm finds o-<sub> after its
-// own mtm-<sub>).
+// thinking levels, skills, agents, MCP servers/tools, settings, and plan quota,
+// built on Ochazuke v2 and Oden v2.
 //
+//	o-ai [tui] [--no-probe] [--fresh] [--smoke]
 //	o-ai NOUN list [--harness H] [--provider P] [--model M] [--search TEXT]
 //	o-ai NOUN show ENTRY|--target ID
 //	o-ai model select ENTRY
 //	o-ai mcp tools [SERVER]          the tools omp cached for a server
-//	o-ai inventory show                the whole inventory
-//	o-ai quota list [claude|codex]   rate-limit windows: % used, % left, resets
-//	o-ai quota show [claude|codex]   a harness's quota record
+//	o-ai inventory show|list|lists   the whole inventory or summary
+//	o-ai quota list|show|refresh     rate-limit windows: % used, % left, resets
 //	o-ai NOUNs                       NOUN list (o-ai skills, o-ai models)
-//	o-ai catalog                     the nouns and verbs, for a host (nabe)
-//
-// NOUN is harness, provider, model, thinking, skill, agent, settings, mcp,
-// mcp-tool, status or quota: an ochazuke runtime behind ochazuke/cli (shell.go), every verb
-// printing JSON. There is no TUI here: o tui (nabe) renders the rows after
-// o-nabe extension register o-ai.
+//	o-ai catalog | query | capabilities | binding | inspect | config | version | smoke
 package main
 
 import (
@@ -33,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	ocli "ofam.dev/ochazuke/cli"
 	"ofam.dev/oden"
 )
 
@@ -75,31 +66,9 @@ func progName(getenv func(string) string) string {
 	return "o-ai"
 }
 
-// Main runs one command: a noun of the runtime (oden resolves a unique
-// prefix, the shell a verb's), catalog, an oden builtin, or by default a
-// plural noun (skills is skill list) and, with no words, inventory list; any
-// other word is oden's not found report.
+// Main runs one invocation of o-ai on the Ochazuke v2 / Oden v2 CLI.
 func (t *Tool) Main(ctx context.Context, args []string) error {
-	app := oden.New("o-ai", args, oden.WithBuiltins(), oden.WithStdio(t.Stdin, t.Stdout, t.Stderr), oden.WithEnv(t.Env))
-	sh := t.shell()
-	ocli.Mount(app, sh)
-	model := app.Catalog().Lookup("model").Command
-	model.Aliases = append(model.Aliases, "mo")
-	app.Add()
-	app.Default = func(ctx context.Context, args []string) error {
-		if len(args) == 0 {
-			return sh.Run(ctx, []string{"inventory", "list"})
-		}
-		if noun := plural(args[0]); noun != "" {
-			rest := args[1:]
-			if len(rest) == 0 || strings.HasPrefix(rest[0], "--") {
-				rest = append([]string{"list"}, rest...)
-			}
-			return sh.Run(ctx, append([]string{noun}, rest...))
-		}
-		return oden.ErrNotFound
-	}
-	return app.Run(ctx)
+	return t.RunCLI(ctx, args)
 }
 
 // plural is the noun a plural word names (skills, harnesses), else "".
@@ -165,6 +134,9 @@ func selectEntry(rows []Entry, query string) (Entry, error) {
 }
 
 func printWarnings(out io.Writer, in Inventory) {
+	if out == nil {
+		return
+	}
 	for _, w := range in.Warnings {
 		fmt.Fprintln(out, "warning:", w)
 	}
@@ -178,6 +150,7 @@ func printWarnings(out io.Writer, in Inventory) {
 func selectionPath(o Options) string {
 	return filepath.Join(o.Home, ".config", "aiview", "selection.json")
 }
+
 func saveSelection(o Options, id string) error {
 	path := selectionPath(o)
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -198,6 +171,7 @@ func saveSelection(o Options, id string) error {
 	}
 	return os.Rename(f.Name(), path)
 }
+
 func loadSelection(o Options) (string, error) {
 	m, err := readConfig(selectionPath(o))
 	if err != nil {

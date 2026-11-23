@@ -5,25 +5,26 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"ofam.dev/ochazuke"
 )
 
-// Tables: a noun with columns declares them on the runtime noun (the
-// catalog's columns), and every row of it, in a list, a --format jsonl
-// line or the state, carries its cells in that order (ochazuke.ListItem.Cells,
-// cli.Row.Cells), so a host such as nabe draws the list as a table. The
-// columns and the cells are each noun's specs (shell.go); a noun without
-// columns (thinking, settings) stays a plain list of labels.
+// tableColumn describes one display column for a noun's table projection.
+type tableColumn struct {
+	Title    string `json:"title"`
+	Min      int    `json:"min,omitempty"`
+	Align    string `json:"align,omitempty"`
+	Priority int    `json:"priority,omitempty"`
+}
 
-// table is a noun's columns and the cells of one of its records.
-type table struct {
-	columns []ochazuke.Column
+const alignRight = "right"
+
+// nounTable is a noun's columns and the cells of one of its records.
+type nounTable struct {
+	columns []tableColumn
 	cells   func(any) []string
 }
 
-var resourceTable = table{
-	columns: []ochazuke.Column{{Title: "name", Min: 12}, {Title: "source", Priority: 2}, {Title: "scope", Priority: 3}, {Title: "description", Priority: 1}},
+var resourceTable = nounTable{
+	columns: []tableColumn{{Title: "name", Min: 12}, {Title: "source", Priority: 2}, {Title: "scope", Priority: 3}, {Title: "description", Priority: 1}},
 	cells: func(v any) []string {
 		r, _ := v.(Resource)
 		source := strings.Join(r.Harnesses, ",")
@@ -34,9 +35,9 @@ var resourceTable = table{
 	},
 }
 
-var tables = map[string]table{
+var tables = map[string]nounTable{
 	"harness": {
-		columns: []ochazuke.Column{{Title: "harness", Min: 8}, {Title: "status", Priority: 1}, {Title: "procs", Align: ochazuke.AlignRight, Priority: 2}, {Title: "catalog", Priority: 3}, {Title: "executable", Priority: 4}},
+		columns: []tableColumn{{Title: "harness", Min: 8}, {Title: "status", Priority: 1}, {Title: "procs", Align: alignRight, Priority: 2}, {Title: "catalog", Priority: 3}, {Title: "executable", Priority: 4}},
 		cells: func(v any) []string {
 			h, _ := v.(Harness)
 			state := "missing"
@@ -50,14 +51,14 @@ var tables = map[string]table{
 		},
 	},
 	"provider": {
-		columns: []ochazuke.Column{{Title: "provider", Min: 10}, {Title: "harness", Priority: 1}, {Title: "models", Align: ochazuke.AlignRight, Priority: 2}, {Title: "access", Priority: 3}},
+		columns: []tableColumn{{Title: "provider", Min: 10}, {Title: "harness", Priority: 1}, {Title: "models", Align: alignRight, Priority: 2}, {Title: "access", Priority: 3}},
 		cells: func(v any) []string {
 			p, _ := v.(Provider)
 			return []string{p.Slug, p.Harness, strconv.Itoa(len(p.Models)), p.Access}
 		},
 	},
 	"model": {
-		columns: []ochazuke.Column{{Title: "model", Min: 16}, {Title: "harness", Priority: 1}, {Title: "provider", Priority: 2}, {Title: "context", Align: ochazuke.AlignRight, Priority: 3}, {Title: "thinking", Priority: 4}},
+		columns: []tableColumn{{Title: "model", Min: 16}, {Title: "harness", Priority: 1}, {Title: "provider", Priority: 2}, {Title: "context", Align: alignRight, Priority: 3}, {Title: "thinking", Priority: 4}},
 		cells: func(v any) []string {
 			m, _ := v.(Model)
 			levels := make([]string, len(m.Thinking))
@@ -70,7 +71,7 @@ var tables = map[string]table{
 	"skill": resourceTable,
 	"agent": resourceTable,
 	"mcp": {
-		columns: []ochazuke.Column{{Title: "server", Min: 10}, {Title: "harness", Priority: 1}, {Title: "scope", Priority: 3}, {Title: "transport", Priority: 4}, {Title: "command", Priority: 2}},
+		columns: []tableColumn{{Title: "server", Min: 10}, {Title: "harness", Priority: 1}, {Title: "scope", Priority: 3}, {Title: "transport", Priority: 4}, {Title: "command", Priority: 2}},
 		cells: func(v any) []string {
 			s, _ := v.(MCPServer)
 			command := strings.Join(append([]string{s.Command}, s.Args...), " ")
@@ -84,21 +85,21 @@ var tables = map[string]table{
 		},
 	},
 	"mcp-tool": {
-		columns: []ochazuke.Column{{Title: "tool", Min: 12}, {Title: "server", Priority: 1}, {Title: "description", Priority: 2}},
+		columns: []tableColumn{{Title: "tool", Min: 12}, {Title: "server", Priority: 1}, {Title: "description", Priority: 2}},
 		cells: func(v any) []string {
 			t, _ := v.(MCPTool)
 			return []string{t.Name, t.Server, cut(t.Description)}
 		},
 	},
 	"inventory": {
-		columns: []ochazuke.Column{{Title: "kind", Min: 10}, {Title: "count", Align: ochazuke.AlignRight}},
+		columns: []tableColumn{{Title: "kind", Min: 10}, {Title: "count", Align: alignRight}},
 		cells: func(v any) []string {
 			c, _ := v.(KindCount)
 			return []string{c.Kind, strconv.Itoa(c.Count)}
 		},
 	},
 	"quota": {
-		columns: []ochazuke.Column{{Title: "harness", Min: 7}, {Title: "window", Min: 10}, {Title: "used", Align: ochazuke.AlignRight}, {Title: "left", Align: ochazuke.AlignRight, Priority: 1}, {Title: "resets", Priority: 2}},
+		columns: []tableColumn{{Title: "harness", Min: 7}, {Title: "window", Min: 10}, {Title: "used", Align: alignRight}, {Title: "left", Align: alignRight, Priority: 1}, {Title: "resets", Priority: 2}},
 		cells: func(v any) []string {
 			switch q := v.(type) {
 			case QuotaWindow:
