@@ -114,6 +114,9 @@ func collectHarness(o Options, need Need, id string) Inventory {
 			add(filepath.Join(c.root, name), "user")
 			add(filepath.Join(o.Project, name), "project")
 		}
+	case "agy":
+		add(filepath.Join(c.root, "settings.json"), "user")
+		add(filepath.Join(o.Home, ".gemini", "settings.json"), "user")
 		if p := os.Getenv("OPENCODE_CONFIG"); p != "" {
 			add(p, "environment override")
 		}

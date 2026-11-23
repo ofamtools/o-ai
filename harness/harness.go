@@ -31,7 +31,7 @@ import (
 const MaxInput = 32 << 20
 
 // IDs are the harnesses o-ai knows, in its collection order.
-var IDs = []string{"omp", "claude", "codex", "pi", "opencode", "gemini", "clawed"}
+var IDs = []string{"omp", "claude", "codex", "pi", "opencode", "gemini", "clawed", "agy"}
 
 // Root is a harness's configuration directory under home, following the
 // harness's own override variable (CLAUDE_CONFIG_DIR, CODEX_HOME,
@@ -47,6 +47,8 @@ func Root(id, home string) string {
 		root = envDefault("CLAUDE_CONFIG_DIR", root)
 	case "codex":
 		root = envDefault("CODEX_HOME", root)
+	case "agy":
+		root = filepath.Join(home, ".gemini", "antigravity-cli")
 	}
 	return root
 }
