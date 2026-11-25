@@ -13,8 +13,8 @@ const Version = "0.2.0"
 // Namespace is the singular namespace o-ai declares.
 const Namespace = "ai"
 
-// nouns are o-ai's domain nouns: the inventory categories, inventory, and quota.
-var nouns = append(append([]string{}, categories...), "inventory", "quota")
+// nouns are o-ai's domain nouns: the inventory categories, inventory, quota, and session.
+var nouns = append(append([]string{}, categories...), "inventory", "quota", "session")
 
 // nounSpec describes what a noun's list/state projections omit or keep and
 // what costly collection parts they need.
@@ -41,6 +41,7 @@ var specs = map[string]nounSpec{
 	"mcp-tool":  {omit: []string{"inputSchema"}, brief: []string{"server", "name", "description", "harness"}},
 	"inventory": {need: needAll},
 	"quota":     {live: true},
+	"session":   {live: true},
 }
 
 var resourceBrief = []string{"name", "description", "path", "harnesses", "scope", "source"}

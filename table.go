@@ -117,6 +117,21 @@ var tables = map[string]nounTable{
 			return nil
 		},
 	},
+	"session": {
+		columns: []tableColumn{{Title: "harness", Min: 8}, {Title: "project", Priority: 2}, {Title: "modified", Priority: 1}, {Title: "size", Align: alignRight, Priority: 3}, {Title: "title", Priority: 1}},
+		cells: func(v any) []string {
+			s, _ := v.(SessionSummary)
+			mod := ""
+			if !s.ModTime.IsZero() {
+				mod = s.ModTime.Local().Format("2006-01-02 15:04")
+			}
+			title := s.Title
+			if title == "" {
+				title = s.Preview
+			}
+			return []string{s.Harness, s.Project, mod, formatBytes(s.SizeBytes), cut(title)}
+		},
+	},
 }
 
 // cellsOf is a record's cells when its noun has columns, else nil.

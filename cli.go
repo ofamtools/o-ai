@@ -55,10 +55,11 @@ func (t *Tool) newOdenApp(args []string) *oden.App {
 	for _, noun := range categories {
 		app.Add(t.cmdNoun(noun))
 	}
-	// Register inventory, quota, list, collect, cache, tui.
+	// Register inventory, quota, session, list, collect, cache, tui.
 	app.Add(
 		t.cmdInventory(),
 		t.cmdQuota(),
+		t.cmdSession(),
 		t.cmdList(),
 		t.cmdCollect(),
 		t.cmdCache(),
@@ -92,11 +93,12 @@ Usage:
   o-ai mcp tools [SERVER]
   o-ai inventory list | show | lists
   o-ai quota list | show | refresh [claude|codex]
+  o-ai session list | show | mine [--harness H] [--limit N] [--since DURATION]
   o-ai cache path | status | clear
-  o-ai NOUNs                         (shorthand for NOUN list, e.g. o-ai skills, o-ai models)
+  o-ai NOUNs                         (shorthand for NOUN list, e.g. o-ai skills, o-ai models, o-ai sessions)
 
 Nouns:
-  harness, provider, model (mo), thinking, skill, agent, setting, mcp, mcp-tool, inventory, quota
+  harness, provider, model (mo), thinking, skill, agent, setting, mcp, mcp-tool, inventory, quota, session (sess)
 `
 	return app
 }
@@ -228,6 +230,24 @@ func aiManifest() *oden.ExtManifest {
 					{Name: "resetsAt", Type: "string", Description: "Reset timestamp"},
 				},
 			},
+			{
+				Kind:           "ai.session",
+				Title:          "Session",
+				Plural:         "Sessions",
+				DefaultColumns: []string{"harness", "project", "modTime", "sizeBytes", "title"},
+				SummaryField:   "title",
+				Fields: []oden.ExtField{
+					{Name: "id", Type: "string", Required: true, Description: "Session record ID (harness:sessionId)"},
+					{Name: "harness", Type: "string", Description: "Owning harness (claude, omp, agy, codex, pi, opencode, matomeru)"},
+					{Name: "path", Type: "string", Description: "Local session file path"},
+					{Name: "sizeBytes", Type: "int", Description: "Session file size in bytes"},
+					{Name: "modTime", Type: "string", Description: "Last modification timestamp (UTC RFC3339)"},
+					{Name: "project", Type: "string", Description: "Project name derived from cwd"},
+					{Name: "cwd", Type: "string", Description: "Session working directory"},
+					{Name: "title", Type: "string", Description: "Session title or first user prompt preview"},
+					{Name: "preview", Type: "string", Description: "Short single-line session preview"},
+				},
+			},
 		},
 		Commands: []oden.ExtCommand{
 			{ID: "ai.harness.list", Description: "List local AI harnesses", Tags: []string{"read"}},
@@ -241,6 +261,9 @@ func aiManifest() *oden.ExtManifest {
 			{ID: "ai.mcp.tools", Description: "List cached MCP tools", Tags: []string{"read"}},
 			{ID: "ai.inventory.show", Description: "Show full AI inventory", Tags: []string{"read"}},
 			{ID: "ai.quota.list", Description: "List rate-limit quota windows", Tags: []string{"read"}},
+			{ID: "ai.session.list", Description: "List local AI session logs", Tags: []string{"read"}},
+			{ID: "ai.session.show", Description: "Inspect a normalized AI session transcript", Tags: []string{"read"}},
+			{ID: "ai.session.mine", Description: "Mine pushback/resolution windows from local sessions", Tags: []string{"read"}},
 		},
 	}
 }
@@ -313,8 +336,37 @@ func (t *Tool) aiQuery(_ context.Context, kind string, args []string) (oden.ExtQ
 		}
 		return oden.ExtQueryResult{Items: items, Total: len(items)}, nil
 
+	case "session":
+		sessions, err := discoverSessions(sessionListOpts{Home: o.Home, Now: t.clock()})
+		if err != nil {
+			return oden.ExtQueryResult{}, err
+		}
+		items := make([]oden.ExtRecord, 0, len(sessions))
+		for _, s := range sessions {
+			hay := strings.ToLower(s.ID + " " + s.Harness + " " + s.Project + " " + s.Cwd + " " + s.Title + " " + s.Preview)
+			if needle != "" && !strings.Contains(hay, needle) {
+				continue
+			}
+			items = append(items, oden.ExtRecord{
+				Kind: "ai.session",
+				ID:   "session/" + s.ID,
+				Fields: map[string]any{
+					"id":        s.ID,
+					"harness":   s.Harness,
+					"path":      s.Path,
+					"sizeBytes": s.SizeBytes,
+					"modTime":   s.ModTime.Format(time.RFC3339),
+					"project":   s.Project,
+					"cwd":       s.Cwd,
+					"title":     s.Title,
+					"preview":   s.Preview,
+				},
+			})
+		}
+		return oden.ExtQueryResult{Items: items, Total: len(items)}, nil
+
 	default:
-		return oden.ExtQueryResult{}, fmt.Errorf("unknown kind %q (expected ai.harness, ai.provider, ai.model, ai.skill, ai.agent, ai.mcp, ai.mcp-tool, or ai.quota)", kind)
+		return oden.ExtQueryResult{}, fmt.Errorf("unknown kind %q (expected ai.harness, ai.provider, ai.model, ai.skill, ai.agent, ai.mcp, ai.mcp-tool, ai.quota, or ai.session)", kind)
 	}
 }
 
